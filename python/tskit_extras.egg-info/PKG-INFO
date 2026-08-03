@@ -1,0 +1,74 @@
+Metadata-Version: 2.4
+Name: tskit_extras
+Version: 0.0.1
+Summary: Extra utility functions on top of tskit.
+Author-email: Yan Wong <yan.wong@bdi.ox.ac.uk>
+License-Expression: MIT
+Project-URL: Homepage, https://github.com/hyanwong/tskit_extras
+Project-URL: Bug Tracker, https://github.com/hyanwong/tskit_extras/issues
+Project-URL: GitHub, https://github.com/hyanwong/tskit_extras
+Keywords: population genetics,tree sequence,ancestral recombination graph,tskit
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Science/Research
+Classifier: Operating System :: POSIX
+Classifier: Operating System :: MacOS :: MacOS X
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Topic :: Scientific/Engineering
+Classifier: Topic :: Scientific/Engineering :: Bio-Informatics
+Requires-Python: >=3.10
+Description-Content-Type: text/x-rst
+Requires-Dist: numpy>=1.23
+Requires-Dist: tskit>=0.5.6
+
+tskit_extras
+============
+
+Extra utility functions on top of `tskit <https://tskit.dev/tskit>`_.
+
+These routines are considered too complex or not fully tested enough for
+inclusion in core tskit, but are tested and ready to use. They can also serve
+as a repository of useful "snippets" that could be reused elsewhere.
+
+Usage
+-----
+
+.. code-block:: python
+
+    import tskit_extras as tsx
+
+    # Reorder nodes in a tree sequence (oldest-first)
+    reordered_ts = tsx.reorder_nodes(ts, order=-ts.nodes_time)
+
+    # Or equivalently:
+    reordered_ts = tsx.TreeSequence.reorder_nodes(ts, order=-ts.nodes_time)
+
+    # Reorder nodes in a TableCollection in-place
+    tsx.TableCollection.reorder_nodes(tables, order=-tables.nodes.time)
+
+    # Count children per parent node across the ARG
+    n_children = tsx.arg_num_children(ts)
+
+    # Remove edges (create polytomies)
+    polytomy_ts = tsx.remove_edges(ts, edge_ids_to_remove)
+
+    # Unsquash edges in an EdgeTable
+    tsx.unsquash(ts.dump_tables().edges, positions=[0.3, 0.7])
+
+Functions
+---------
+
+- ``reorder_nodes(ts, order)`` — reorder nodes in a tree sequence
+  (`discussion #3466 <https://github.com/tskit-dev/tskit/discussions/3466>`_)
+- ``arg_num_children(ts)`` — count unique children per parent in the ARG
+  (`discussion #3449 <https://github.com/tskit-dev/tskit/discussions/3449>`_)
+- ``remove_edges(ts, edge_id_remove_list)`` — create polytomies by removing edges
+  (`discussion #2926 <https://github.com/tskit-dev/tskit/discussions/2926>`_)
+- ``unsquash(edge_table, positions)`` — opposite of ``EdgeTable.squash()``
+  (`discussion #2657 <https://github.com/tskit-dev/tskit/discussions/2657>`_)
