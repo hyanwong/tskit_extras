@@ -1,0 +1,110 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tskit_extras"
+dynamic = ["version"]
+authors = [
+    {name = "Yan Wong", email = "yan.wong@bdi.ox.ac.uk"},
+]
+description = "Extra utility functions on top of tskit."
+readme = "README.rst"
+license = "MIT"
+classifiers = [
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3 :: Only",
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+keywords = [
+    "population genetics",
+    "tree sequence",
+    "ancestral recombination graph",
+    "tskit",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.23",
+    "tskit>=0.5.6",
+]
+
+[project.urls]
+Homepage = "https://github.com/hyanwong/tskit_extras"
+"Bug Tracker" = "https://github.com/hyanwong/tskit_extras/issues"
+GitHub = "https://github.com/hyanwong/tskit_extras"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tskit_extras*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "tskit_extras._version.tskit_extras_version"}
+
+[dependency-groups]
+test = [
+    "msprime>=1.0",
+    "pytest",
+    "pytest-xdist",
+]
+
+lint = [
+    "ruff==0.11.13",
+]
+
+dev = [
+    {include-group = "lint"},
+    {include-group = "test"},
+]
+
+[tool.pytest.ini_options]
+addopts = "-n auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 89
+indent-width = 4
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "W", "I", "N", "UP", "A", "PT"]
+
+ignore = [
+    "A001", "A002",
+    "B905",
+    "E741",
+    "N806", "N802", "N803",
+    "N818",
+    "UP032",
+    "UP031",
+    "B904",
+    "PT006",
+    "PT007",
+    "PT009",
+    "PT018",
+    "PT011",
+    "PT012",
+    "B018",
+]
+
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["tskit_extras"]
+known-third-party = [
+  "msprime",
+  "numpy",
+  "pytest",
+  "tskit",
+]
