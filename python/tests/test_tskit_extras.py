@@ -259,6 +259,25 @@ class TestUnsquash:
         assert tables.edges.num_rows == 2
 
 
+class TestInvertMap:
+    """Tests for invert_map."""
+
+    def test_inverts_simplify_node_map(self):
+        ts = get_simple_ts(n=8)
+        simplified_ts, node_map = ts.simplify(
+            samples=ts.samples()[:4], map_nodes=True
+        )
+        rev_map = tsx.invert_map(node_map)
+        np.testing.assert_array_equal(
+            node_map[rev_map], np.arange(simplified_ts.num_nodes)
+        )
+
+    def test_skips_null_entries(self):
+        node_map = np.array([2, tskit.NULL, 0, 1, tskit.NULL], dtype=np.int32)
+        rev_map = tsx.invert_map(node_map)
+        np.testing.assert_array_equal(rev_map, [2, 3, 0])
+
+
 class TestVersionAndImports:
     """Basic import and version sanity checks."""
 
@@ -270,6 +289,7 @@ class TestVersionAndImports:
         for name in [
             "reorder_nodes",
             "arg_num_children",
+            "invert_map",
             "remove_edges",
             "unsquash",
             "TreeSequence",

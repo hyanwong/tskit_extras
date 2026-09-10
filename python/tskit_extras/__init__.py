@@ -24,6 +24,7 @@ __version__ = _version.tskit_extras_version
 __all__ = [
     "reorder_nodes",
     "arg_num_children",
+    "invert_map",
     "unsquash",
     "remove_edges",
     "TableCollection",
@@ -281,6 +282,26 @@ class EdgeTable:
             ):
                 new_edges.append(edge.replace(left=left, right=right))
         edge_table.replace_with(new_edges)
+
+
+def invert_map(node_mapping):
+    """
+    Invert a node map returned by :meth:`tskit.TreeSequence.simplify`.
+
+    :param array_like node_mapping: A node map such as that returned by
+        ``ts.simplify(..., map_nodes=True)``.
+    :return: An array ``rev_map`` such that ``rev_map[new_id]`` gives the
+        corresponding original node ID.
+    :rtype: numpy.ndarray
+
+    See https://tskit.dev/tutorials/advanced_simplification.html#obtaining-the-reverse-map
+    """
+    node_mapping = np.asarray(node_mapping)
+    kept = node_mapping != tskit.NULL
+    indexes = node_mapping[kept]
+    rev_map = np.full_like(indexes, tskit.NULL)
+    rev_map[indexes] = np.flatnonzero(kept)
+    return rev_map
 
 
 # Top-level convenience aliases so that ``tsx.method(...)`` works.
