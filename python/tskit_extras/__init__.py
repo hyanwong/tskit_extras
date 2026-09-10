@@ -299,7 +299,11 @@ def invert_map(node_mapping):
     node_mapping = np.asarray(node_mapping)
     kept = node_mapping != tskit.NULL
     indexes = node_mapping[kept]
-    rev_map = np.full_like(indexes, tskit.NULL)
+    rev_map = np.full(
+        0 if len(indexes) == 0 else np.max(indexes) + 1,
+        tskit.NULL,
+        dtype=node_mapping.dtype,
+    )
     rev_map[indexes] = np.flatnonzero(kept)
     return rev_map
 

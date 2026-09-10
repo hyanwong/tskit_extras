@@ -277,6 +277,11 @@ class TestInvertMap:
         rev_map = tsx.invert_map(node_map)
         np.testing.assert_array_equal(rev_map, [2, 3, 0])
 
+    def test_handles_sparse_output_ids(self):
+        node_map = np.array([3, tskit.NULL, 1], dtype=np.int32)
+        rev_map = tsx.invert_map(node_map)
+        np.testing.assert_array_equal(rev_map, [tskit.NULL, 2, tskit.NULL, 0])
+
 
 class TestVersionAndImports:
     """Basic import and version sanity checks."""
