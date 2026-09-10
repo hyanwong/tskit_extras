@@ -31,6 +31,9 @@ tsx.TableCollection.reorder_nodes(tables, order=-tables.nodes.time)
 # Count children per parent node across the ARG
 n_children = tsx.arg_num_children(ts)
 
+# Invert a simplify node map
+rev_map = tsx.invert_map(node_map)
+
 # Remove edges (create polytomies)
 polytomy_ts = tsx.remove_edges(ts, edge_ids_to_remove)
 
@@ -44,6 +47,7 @@ tsx.unsquash(tables.edges, positions=[0.3, 0.7])
 |---|---|---|
 | `reorder_nodes(ts, order)` | Reorder nodes in a tree sequence | [#3466](https://github.com/tskit-dev/tskit/discussions/3466) |
 | `arg_num_children(ts)` | Count unique children per parent in the ARG | [#3449](https://github.com/tskit-dev/tskit/discussions/3449) |
+| `invert_map(node_map)` | Invert a simplify node map | [reverse map docs](https://tskit.dev/tutorials/advanced_simplification.html#obtaining-the-reverse-map) |
 | `remove_edges(ts, edge_id_remove_list)` | Create polytomies by removing edges | [#2926](https://github.com/tskit-dev/tskit/discussions/2926) |
 | `unsquash(edge_table, positions)` | Opposite of `EdgeTable.squash()` | [#2657](https://github.com/tskit-dev/tskit/discussions/2657) |
 
