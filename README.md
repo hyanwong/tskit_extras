@@ -11,7 +11,10 @@ as a repository of useful "snippets" that could be reused elsewhere.
 Only functions that operate on a `TreeSequence` have direct top-level aliases
 such as `tsx.reorder_nodes`. Utilities for other tskit objects are accessed
 through their corresponding namespace, such as `tsx.TableCollection` or
-`tsx.EdgeTable`.
+`tsx.EdgeTable`. The `tsx.TreeNode.all_binary_trees(leaf_labels)` method lazily
+yields every rooted binary resolution of the labeled polytomy. For a full
+`tskit.Tree`, `tsx.Tree.all_binary_resolutions(tree)` lazily yields trees for all
+combinations of its polytomies.
 
 ## Installation
 
@@ -41,6 +44,14 @@ polytomy_ts = tsx.remove_edges(ts, edge_ids_to_remove)
 
 # Unsquash edges in an EdgeTable at given positions
 tsx.EdgeTable.unsquash(tables.edges, positions=[0.3, 0.7])
+
+# Lazily enumerate binary resolutions of a polytomy
+for tree in tsx.TreeNode.all_binary_trees([0, 1, 2, 3]):
+    process(tree)
+
+# Enumerate all binary resolutions of a tskit Tree
+for resolved_tree in tsx.Tree.all_binary_resolutions(tree):
+    process(resolved_tree)
 ```
 
 ## Functions
@@ -60,6 +71,8 @@ The TreeSequence functions are also available through the TreeSequence namespace
 Utilities for other object types are only available through their namespaces:
 - `tsx.TableCollection.reorder_nodes(tables, order)`
 - `tsx.EdgeTable.unsquash(edge_table, positions)`
+- `tsx.TreeNode.all_binary_trees(leaf_labels)`
+- `tsx.Tree.all_binary_resolutions(tree)`
 
 ## Repository structure
 
