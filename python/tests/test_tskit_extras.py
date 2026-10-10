@@ -2,6 +2,7 @@
 Tests for tskit_extras.
 """
 
+import inspect
 
 import msprime
 import numpy as np
@@ -213,7 +214,7 @@ class TestUnsquash:
         tables.nodes.add_row(time=0, population=0, flags=tskit.NODE_IS_SAMPLE)
         tables.nodes.add_row(time=1, population=0)
         tables.edges.add_row(left=0, right=100, parent=1, child=0)
-        tsx.unsquash(tables.edges, positions=[25, 50, 75])
+        tsx.EdgeTable.unsquash(tables.edges, positions=[25, 50, 75])
         assert tables.edges.num_rows == 4
         np.testing.assert_array_equal(tables.edges.left, [0, 25, 50, 75])
         np.testing.assert_array_equal(tables.edges.right, [25, 50, 75, 100])
@@ -225,7 +226,7 @@ class TestUnsquash:
         tables.nodes.add_row(time=1, population=0)
         tables.edges.add_row(left=0, right=50, parent=1, child=0)
         # Positions outside the edge span should be ignored
-        tsx.unsquash(tables.edges, positions=[60, 80])
+        tsx.EdgeTable.unsquash(tables.edges, positions=[60, 80])
         assert tables.edges.num_rows == 1
 
     def test_unsquash_subset_of_edges(self):
@@ -237,7 +238,7 @@ class TestUnsquash:
         tables.edges.add_row(left=0, right=100, parent=2, child=0)
         tables.edges.add_row(left=0, right=100, parent=2, child=1)
         # Only split the first edge (index 0)
-        tsx.unsquash(tables.edges, positions=[50], edges=[0])
+        tsx.EdgeTable.unsquash(tables.edges, positions=[50], edges=[0])
         assert tables.edges.num_rows == 3
 
     def test_unsquash_deduplicates_positions(self):
@@ -246,16 +247,16 @@ class TestUnsquash:
         tables.nodes.add_row(time=0, population=0, flags=tskit.NODE_IS_SAMPLE)
         tables.nodes.add_row(time=1, population=0)
         tables.edges.add_row(left=0, right=100, parent=1, child=0)
-        tsx.unsquash(tables.edges, positions=[50, 50, 50])
+        tsx.EdgeTable.unsquash(tables.edges, positions=[50, 50, 50])
         assert tables.edges.num_rows == 2
 
-    def test_top_level_alias(self):
+    def test_edge_table_namespace(self):
         tables = tskit.TableCollection(sequence_length=100)
         tables.populations.add_row()
         tables.nodes.add_row(time=0, population=0, flags=tskit.NODE_IS_SAMPLE)
         tables.nodes.add_row(time=1, population=0)
         tables.edges.add_row(left=0, right=100, parent=1, child=0)
-        tsx.unsquash(tables.edges, positions=[50])
+        tsx.EdgeTable.unsquash(tables.edges, positions=[50])
         assert tables.edges.num_rows == 2
 
 
@@ -271,8 +272,23 @@ class TestVersionAndImports:
             "reorder_nodes",
             "arg_num_children",
             "remove_edges",
-            "unsquash",
             "TreeSequence",
             "TableCollection",
+            "EdgeTable",
         ]:
             assert hasattr(tsx, name)
+        assert not hasattr(tsx, "unsquash")
+
+    def test_top_level_functions_take_tree_sequence_first(self):
+        functions = [
+            (name, function)
+            for name, function in inspect.getmembers(tsx, inspect.isfunction)
+            if function.__module__ == tsx.__name__
+        ]
+        assert functions
+        for name, function in functions:
+            parameters = inspect.signature(function).parameters
+            assert parameters and next(iter(parameters)) == "ts", (
+                f"Top-level function {name} must take a TreeSequence as its "
+                "first argument"
+            )
