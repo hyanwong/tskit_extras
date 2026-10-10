@@ -1,8 +1,13 @@
 """Tests for the public tskit_extras API."""
 
 import inspect
+from importlib.metadata import metadata
 
 import tskit_extras as tsx
+
+
+def test_minimum_python_version():
+    assert metadata("tskit_extras")["Requires-Python"] == ">=3.11"
 
 
 def test_version_string():

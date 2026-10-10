@@ -55,8 +55,6 @@ class EdgeTable:
         are divided into separate edges at every specified position. This is the
         opposite of :meth:`tskit.EdgeTable.squash`.
 
-        Requires Python 3.10 or later.
-
         :param tskit.EdgeTable edge_table: The edge table to modify in-place.
         :param array_like positions: Positions at which to split edges.
         :param list edges: Indices of edges to split (``None`` means all edges).
