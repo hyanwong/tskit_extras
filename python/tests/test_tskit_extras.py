@@ -348,6 +348,25 @@ class TestAllBinaryTrees:
         assert len(resolutions) == 9
         assert len({resolution.rank() for resolution in resolutions}) == 9
 
+    def test_all_binary_resolutions_mixed_arity(self):
+        tree = tskit.Tree.generate_balanced(8, arity=3)
+        num_tritomies = sum(tree.num_children(u) == 3 for u in tree.nodes())
+        assert num_tritomies == 2
+        assert any(tree.num_children(u) == 2 for u in tree.nodes())
+
+        resolutions = list(
+            tsx.Tree.all_binary_resolutions(tree, record_provenance=False)
+        )
+        assert len(resolutions) == 9
+        assert len({resolution.rank() for resolution in resolutions}) == len(
+            resolutions
+        )
+        assert all(
+            resolution.num_children(u) <= 2
+            for resolution in resolutions
+            for u in resolution.nodes()
+        )
+
     def test_is_lazy_and_handles_one_leaf(self):
         trees = tsx.TreeNode.all_binary_trees(iter([42]))
         assert inspect.isgenerator(trees)
