@@ -10,7 +10,11 @@ as a repository of useful "snippets" that could be reused elsewhere.
 Only functions that operate on a :class:`tskit.TreeSequence` have direct
 top-level aliases such as ``tsx.reorder_nodes``. Utilities for other tskit
 objects are accessed through their corresponding namespace, such as
-``tsx.TableCollection`` or ``tsx.EdgeTable``.
+``tsx.TableCollection`` or ``tsx.EdgeTable``. The
+``tsx.TreeNode.all_binary_trees(leaf_labels)`` method lazily yields every
+rooted binary resolution of the labelled polytomy. For a full
+:class:`tskit.Tree`, ``tsx.Tree.all_binary_resolutions(tree)`` lazily yields
+trees for all combinations of its polytomies.
 
 Usage
 -----
@@ -37,6 +41,14 @@ Usage
     # Unsquash edges in an EdgeTable
     tsx.EdgeTable.unsquash(ts.dump_tables().edges, positions=[0.3, 0.7])
 
+    # Lazily enumerate binary resolutions of a polytomy
+    for tree in tsx.TreeNode.all_binary_trees([0, 1, 2, 3]):
+        process(tree)
+
+    # Enumerate all binary resolutions of a tskit Tree
+    for resolved_tree in tsx.Tree.all_binary_resolutions(tree):
+        process(resolved_tree)
+
 Functions
 ---------
 
@@ -48,3 +60,5 @@ Functions
   (`discussion #2926 <https://github.com/tskit-dev/tskit/discussions/2926>`_)
 - ``EdgeTable.unsquash(edge_table, positions)`` — opposite of ``EdgeTable.squash()``
   (`discussion #2657 <https://github.com/tskit-dev/tskit/discussions/2657>`_)
+- ``TreeNode.all_binary_trees(leaf_labels)`` — yield all rooted binary resolutions of a polytomy
+- ``Tree.all_binary_resolutions(tree)`` — yield all combinations resolving a tskit Tree
