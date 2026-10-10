@@ -24,10 +24,10 @@ __version__ = _version.tskit_extras_version
 __all__ = [
     "reorder_nodes",
     "arg_num_children",
-    "unsquash",
     "remove_edges",
     "TableCollection",
     "TreeSequence",
+    "EdgeTable",
 ]
 
 
@@ -298,8 +298,3 @@ def arg_num_children(ts):
 def remove_edges(ts, edge_id_remove_list):
     """Alias for :meth:`TreeSequence.remove_edges`."""
     return TreeSequence.remove_edges(ts, edge_id_remove_list)
-
-
-def unsquash(edge_table, positions, edges=None):
-    """Alias for :meth:`EdgeTable.unsquash`."""
-    return EdgeTable.unsquash(edge_table, positions, edges)

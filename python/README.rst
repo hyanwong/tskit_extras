@@ -7,6 +7,11 @@ These routines are considered too complex or not fully tested enough for
 inclusion in core tskit, but are tested and ready to use. They can also serve
 as a repository of useful "snippets" that could be reused elsewhere.
 
+Only functions that operate on a :class:`tskit.TreeSequence` have direct
+top-level aliases such as ``tsx.reorder_nodes``. Utilities for other tskit
+objects are accessed through their corresponding namespace, such as
+``tsx.TableCollection`` or ``tsx.EdgeTable``.
+
 Usage
 -----
 
@@ -30,7 +35,7 @@ Usage
     polytomy_ts = tsx.remove_edges(ts, edge_ids_to_remove)
 
     # Unsquash edges in an EdgeTable
-    tsx.unsquash(ts.dump_tables().edges, positions=[0.3, 0.7])
+    tsx.EdgeTable.unsquash(ts.dump_tables().edges, positions=[0.3, 0.7])
 
 Functions
 ---------
@@ -41,5 +46,5 @@ Functions
   (`discussion #3449 <https://github.com/tskit-dev/tskit/discussions/3449>`_)
 - ``remove_edges(ts, edge_id_remove_list)`` — create polytomies by removing edges
   (`discussion #2926 <https://github.com/tskit-dev/tskit/discussions/2926>`_)
-- ``unsquash(edge_table, positions)`` — opposite of ``EdgeTable.squash()``
+- ``EdgeTable.unsquash(edge_table, positions)`` — opposite of ``EdgeTable.squash()``
   (`discussion #2657 <https://github.com/tskit-dev/tskit/discussions/2657>`_)

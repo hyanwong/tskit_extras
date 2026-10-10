@@ -8,6 +8,11 @@ These routines are considered too complex or not fully tested enough for
 inclusion in core tskit, but are tested and ready to use. They can also serve
 as a repository of useful "snippets" that could be reused elsewhere.
 
+Only functions that operate on a `TreeSequence` have direct top-level aliases
+such as `tsx.reorder_nodes`. Utilities for other tskit objects are accessed
+through their corresponding namespace, such as `tsx.TableCollection` or
+`tsx.EdgeTable`.
+
 ## Installation
 
 ```bash
@@ -35,7 +40,7 @@ n_children = tsx.arg_num_children(ts)
 polytomy_ts = tsx.remove_edges(ts, edge_ids_to_remove)
 
 # Unsquash edges in an EdgeTable at given positions
-tsx.unsquash(tables.edges, positions=[0.3, 0.7])
+tsx.EdgeTable.unsquash(tables.edges, positions=[0.3, 0.7])
 ```
 
 ## Functions
@@ -45,12 +50,14 @@ tsx.unsquash(tables.edges, positions=[0.3, 0.7])
 | `reorder_nodes(ts, order)` | Reorder nodes in a tree sequence | [#3466](https://github.com/tskit-dev/tskit/discussions/3466) |
 | `arg_num_children(ts)` | Count unique children per parent in the ARG | [#3449](https://github.com/tskit-dev/tskit/discussions/3449) |
 | `remove_edges(ts, edge_id_remove_list)` | Create polytomies by removing edges | [#2926](https://github.com/tskit-dev/tskit/discussions/2926) |
-| `unsquash(edge_table, positions)` | Opposite of `EdgeTable.squash()` | [#2657](https://github.com/tskit-dev/tskit/discussions/2657) |
+| `EdgeTable.unsquash(edge_table, positions)` | Opposite of `EdgeTable.squash()` | [#2657](https://github.com/tskit-dev/tskit/discussions/2657) |
 
-Each function is also accessible via the class-based API:
+The TreeSequence functions are also available through the TreeSequence namespace:
 - `tsx.TreeSequence.reorder_nodes(ts, order)`
 - `tsx.TreeSequence.arg_num_children(ts)`
 - `tsx.TreeSequence.remove_edges(ts, edge_id_remove_list)`
+
+Utilities for other object types are only available through their namespaces:
 - `tsx.TableCollection.reorder_nodes(tables, order)`
 - `tsx.EdgeTable.unsquash(edge_table, positions)`
 
