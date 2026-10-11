@@ -37,6 +37,10 @@ Usage
     # Count children per parent node across the ARG
     n_children = tsx.arg_num_children(ts)
 
+    # Invert a simplify node map (index by new ID to obtain the original ID)
+    simplified_ts, node_map = ts.simplify(samples=ts.samples()[:4], map_nodes=True)
+    reverse_map = tsx.utils.invert_map(node_map)
+
     # Remove edges (create polytomies)
     polytomy_ts = tsx.remove_edges(ts, edge_ids_to_remove)
 
@@ -72,10 +76,17 @@ assessed across all genomic segments connecting a parent-child pair; set
 Functions
 ---------
 
+Standalone helpers that do not operate on a particular tskit object are
+available through the ``tsx.utils`` module. For example,
+``tsx.utils.invert_map(node_mapping)`` inverts a simplify node map. This
+namespace is intended for such utilities, rather than as a general catch-all.
+
 - ``reorder_nodes(ts, order)`` — reorder nodes in a tree sequence
   (`discussion #3466 <https://github.com/tskit-dev/tskit/discussions/3466>`_)
 - ``arg_num_children(ts)`` — count unique children per parent in the ARG
   (`discussion #3449 <https://github.com/tskit-dev/tskit/discussions/3449>`_)
+- ``utils.invert_map(node_mapping)`` — invert a simplify node map
+  (`issue #3 <https://github.com/hyanwong/tskit_extras/issues/3>`_)
 - ``remove_edges(ts, edge_id_remove_list)`` — create polytomies by removing edges
   (`discussion #2926 <https://github.com/tskit-dev/tskit/discussions/2926>`_)
 - ``unsupported_edges(ts, per_interval=False)`` — find edges without mutations,

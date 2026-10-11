@@ -19,6 +19,7 @@ def test_module_exports():
     for name in [
         "reorder_nodes",
         "arg_num_children",
+        "utils",
         "remove_edges",
         "unsupported_edges",
         "TreeSequence",

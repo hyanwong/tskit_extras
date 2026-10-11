@@ -11,7 +11,7 @@ for inclusion in core tskit. Functions can be accessed as:
     tsx.TableCollection.reorder_nodes(tables, order)
 """
 
-from . import _version
+from . import _version, utils
 from .tables import EdgeTable, TableCollection
 from .tree_sequence import TreeSequence
 from .trees import Tree, TreeNode
@@ -21,6 +21,7 @@ __version__ = _version.tskit_extras_version
 __all__ = [
     "reorder_nodes",
     "arg_num_children",
+    "utils",
     "remove_edges",
     "unsupported_edges",
     "TableCollection",

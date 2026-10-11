@@ -41,6 +41,10 @@ tsx.TableCollection.reorder_nodes(tables, order=-tables.nodes.time)
 # Count children per parent node across the ARG
 n_children = tsx.arg_num_children(ts)
 
+# Invert a simplify node map (index by new ID to obtain the original ID)
+simplified_ts, node_map = ts.simplify(samples=ts.samples()[:4], map_nodes=True)
+reverse_map = tsx.utils.invert_map(node_map)
+
 # Remove edges (create polytomies)
 polytomy_ts = tsx.remove_edges(ts, edge_ids_to_remove)
 
@@ -88,7 +92,11 @@ The TreeSequence functions are also available through the TreeSequence namespace
 - `tsx.TreeSequence.remove_edges(ts, edge_id_remove_list)`
 - `tsx.TreeSequence.unsupported_edges(ts, per_interval=False)`
 
-Utilities for other object types are only available through their namespaces:
+Helpers that do not operate on a particular tskit object are grouped in
+`tsx.utils`; for example, `tsx.utils.invert_map(node_mapping)` inverts a
+simplify node map. This module is for standalone utilities, rather than a
+general catch-all. Helpers for specific non-TreeSequence objects are available
+through their namespaces:
 - `tsx.TableCollection.reorder_nodes(tables, order)`
 - `tsx.EdgeTable.unsquash(edge_table, positions)`
 - `tsx.TreeNode.all_binary_trees(leaf_labels)`
