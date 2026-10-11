@@ -23,6 +23,7 @@ __all__ = [
     "arg_num_children",
     "utils",
     "remove_edges",
+    "remove_root_mutations",
     "unsupported_edges",
     "TableCollection",
     "TreeSequence",
@@ -45,6 +46,11 @@ def arg_num_children(ts):
 def remove_edges(ts, edge_id_remove_list):
     """Alias for :meth:`TreeSequence.remove_edges`."""
     return TreeSequence.remove_edges(ts, edge_id_remove_list)
+
+
+def remove_root_mutations(ts):
+    """Alias for :meth:`TreeSequence.remove_root_mutations`."""
+    return TreeSequence.remove_root_mutations(ts)
 
 
 def unsupported_edges(ts, *, per_interval=False):
