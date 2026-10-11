@@ -38,6 +38,10 @@ Usage
     # Remove edges (create polytomies)
     polytomy_ts = tsx.remove_edges(ts, edge_ids_to_remove)
 
+    # Find edges without mutations, excluding edges above samples
+    unsupported = tsx.unsupported_edges(ts, per_interval=True)
+    polytomy_ts = tsx.remove_edges(ts, unsupported)
+
     # Unsquash edges in an EdgeTable
     tsx.EdgeTable.unsquash(ts.dump_tables().edges, positions=[0.3, 0.7])
 
@@ -49,6 +53,15 @@ Usage
     for resolved_tree in tsx.Tree.all_binary_resolutions(tree):
         process(resolved_tree)
 
+``remove_edges`` rejects edges carrying mutations. Removing an edge above a sample
+node (including an internal sample) can also change that sample's genotype by
+disconnecting it from mutations on its ancestral path. Removing only a subset of
+edges returned by ``unsupported_edges`` is intended to preserve sample genotypes;
+arbitrary edge selections are not guaranteed to do so. ``unsupported_edges`` excludes
+both mutation-bearing edges and edges whose child is a sample. By default, support is
+assessed across all genomic segments connecting a parent-child pair; set
+``per_interval=True`` to assess each segment independently.
+
 Functions
 ---------
 
@@ -57,6 +70,9 @@ Functions
 - ``arg_num_children(ts)`` — count unique children per parent in the ARG
   (`discussion #3449 <https://github.com/tskit-dev/tskit/discussions/3449>`_)
 - ``remove_edges(ts, edge_id_remove_list)`` — create polytomies by removing edges
+  (`discussion #2926 <https://github.com/tskit-dev/tskit/discussions/2926>`_)
+- ``unsupported_edges(ts, per_interval=False)`` — find edges without mutations,
+  excluding edges above samples
   (`discussion #2926 <https://github.com/tskit-dev/tskit/discussions/2926>`_)
 - ``EdgeTable.unsquash(edge_table, positions)`` — opposite of ``EdgeTable.squash()``
   (`discussion #2657 <https://github.com/tskit-dev/tskit/discussions/2657>`_)

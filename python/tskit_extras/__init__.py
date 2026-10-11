@@ -22,6 +22,7 @@ __all__ = [
     "reorder_nodes",
     "arg_num_children",
     "remove_edges",
+    "unsupported_edges",
     "TableCollection",
     "TreeSequence",
     "EdgeTable",
@@ -43,3 +44,8 @@ def arg_num_children(ts):
 def remove_edges(ts, edge_id_remove_list):
     """Alias for :meth:`TreeSequence.remove_edges`."""
     return TreeSequence.remove_edges(ts, edge_id_remove_list)
+
+
+def unsupported_edges(ts, *, per_interval=False):
+    """Alias for :meth:`TreeSequence.unsupported_edges`."""
+    return TreeSequence.unsupported_edges(ts, per_interval=per_interval)
