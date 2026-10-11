@@ -14,7 +14,9 @@ through their corresponding namespace, such as `tsx.TableCollection` or
 `tsx.EdgeTable`. The `tsx.TreeNode.all_binary_trees(leaf_labels)` method lazily
 yields every rooted binary resolution of the labeled polytomy. For a full
 `tskit.Tree`, `tsx.Tree.all_binary_resolutions(tree)` lazily yields trees for all
-combinations of its polytomies.
+combinations of its polytomies. `tsx.Tree.optimal_tree_refinement_parsimony_score(
+tree, genotypes, alleles)` returns the minimum parsimony score over those binary
+refinements.
 
 ## Installation
 
@@ -56,6 +58,9 @@ for tree in tsx.TreeNode.all_binary_trees([0, 1, 2, 3]):
 # Enumerate all binary resolutions of a tskit Tree
 for resolved_tree in tsx.Tree.all_binary_resolutions(tree):
     process(resolved_tree)
+
+# Score observed sample states over all binary refinements
+score = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, alleles)
 ```
 
 `remove_edges` rejects edges carrying mutations. Removing an edge above a sample node
@@ -88,6 +93,8 @@ Utilities for other object types are only available through their namespaces:
 - `tsx.EdgeTable.unsquash(edge_table, positions)`
 - `tsx.TreeNode.all_binary_trees(leaf_labels)`
 - `tsx.Tree.all_binary_resolutions(tree)`
+- `tsx.Tree.optimal_tree_refinement_parsimony_score(
+  tree, genotypes, alleles, ancestral_state=None)`
 
 ## Repository structure
 
