@@ -8,15 +8,17 @@ These routines are considered too complex or not fully tested enough for
 inclusion in core tskit, but are tested and ready to use. They can also serve
 as a repository of useful "snippets" that could be reused elsewhere.
 
-Only functions that operate on a `TreeSequence` have direct top-level aliases
-such as `tsx.reorder_nodes`. Utilities for other tskit objects are accessed
-through their corresponding namespace, such as `tsx.TableCollection` or
-`tsx.EdgeTable`. The `tsx.TreeNode.all_binary_trees(leaf_labels)` method lazily
-yields every rooted binary resolution of the labeled polytomy. For a full
-`tskit.Tree`, `tsx.Tree.all_binary_resolutions(tree)` lazily yields trees for all
-combinations of its polytomies. `tsx.Tree.optimal_tree_refinement_parsimony_score(
-tree, genotypes, alleles)` returns the minimum parsimony score over those binary
-refinements.
+### Calling conventions
+
+Functions that operate on a _tskit_ object are invoked as `.TskitObject.function()`,
+for example `.Tree.all_binary_resolutions()`, or `.EdgeTable.unsquash()`.
+Stand-alone functions e.g. that operate on an array are stores in the `.utils`
+namespace, for example `.utils.invert_map`.
+
+We recommend that you `import tskit_extras as tsx`, and as a convenient shortcut,
+functions that operate on a `tskit.TreeSequence` object
+have direct top-level aliases. E.g. `tsx.TreeSequence.reorder_nodes(ts, order)`
+can equally be called as `tsx.reorder_nodes(ts, order)`. 
 
 ## Installation
 
