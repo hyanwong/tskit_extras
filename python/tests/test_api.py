@@ -20,6 +20,7 @@ def test_module_exports():
         "reorder_nodes",
         "arg_num_children",
         "remove_edges",
+        "unsupported_edges",
         "TreeSequence",
         "TableCollection",
         "EdgeTable",

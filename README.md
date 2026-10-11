@@ -42,6 +42,10 @@ n_children = tsx.arg_num_children(ts)
 # Remove edges (create polytomies)
 polytomy_ts = tsx.remove_edges(ts, edge_ids_to_remove)
 
+# Find edges without mutations (excluding edges above samples)
+unsupported = tsx.unsupported_edges(ts, per_interval=True)
+polytomy_ts = tsx.remove_edges(ts, unsupported)
+
 # Unsquash edges in an EdgeTable at given positions
 tsx.EdgeTable.unsquash(tables.edges, positions=[0.3, 0.7])
 
@@ -54,6 +58,15 @@ for resolved_tree in tsx.Tree.all_binary_resolutions(tree):
     process(resolved_tree)
 ```
 
+`remove_edges` rejects edges carrying mutations. Removing an edge above a sample node
+(including an internal sample) can also change that sample's genotype by disconnecting
+it from mutations on its ancestral path. Removing only a subset of edges returned by
+`unsupported_edges` is intended to preserve sample genotypes; arbitrary edge selections
+are not guaranteed to do so. `unsupported_edges` excludes both mutation-bearing edges
+and edges whose child is a sample. By default, support is assessed across all genomic
+segments connecting a parent-child pair; set `per_interval=True` to assess each segment
+independently.
+
 ## Functions
 
 | Function | Description | Source discussion |
@@ -61,12 +74,14 @@ for resolved_tree in tsx.Tree.all_binary_resolutions(tree):
 | `reorder_nodes(ts, order)` | Reorder nodes in a tree sequence | [#3466](https://github.com/tskit-dev/tskit/discussions/3466) |
 | `arg_num_children(ts)` | Count unique children per parent in the ARG | [#3449](https://github.com/tskit-dev/tskit/discussions/3449) |
 | `remove_edges(ts, edge_id_remove_list)` | Create polytomies by removing edges | [#2926](https://github.com/tskit-dev/tskit/discussions/2926) |
+| `unsupported_edges(ts, per_interval=False)` | Find edges without mutations, excluding edges above samples | [#2926](https://github.com/tskit-dev/tskit/discussions/2926) |
 | `EdgeTable.unsquash(edge_table, positions)` | Opposite of `EdgeTable.squash()` | [#2657](https://github.com/tskit-dev/tskit/discussions/2657) |
 
 The TreeSequence functions are also available through the TreeSequence namespace:
 - `tsx.TreeSequence.reorder_nodes(ts, order)`
 - `tsx.TreeSequence.arg_num_children(ts)`
 - `tsx.TreeSequence.remove_edges(ts, edge_id_remove_list)`
+- `tsx.TreeSequence.unsupported_edges(ts, per_interval=False)`
 
 Utilities for other object types are only available through their namespaces:
 - `tsx.TableCollection.reorder_nodes(tables, order)`

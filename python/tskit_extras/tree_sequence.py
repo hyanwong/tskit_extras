@@ -2,8 +2,10 @@
 
 import collections
 import itertools
+import operator
 
 import numpy as np
+import tskit
 
 from .tables import TableCollection
 
@@ -71,106 +73,164 @@ class TreeSequence:
         """
         Create polytomies by removing edges from a tree sequence.
 
-        When an edge is removed, the children of the removed edge are grafted onto
-        the parent of the removed edge over the same genomic span. Mutations associated
-        with the edges to be removed must be moved or deleted beforehand (a
-        :exc:`ValueError` is raised if any such mutations exist).
+        For each removed edge, its child is disconnected from its parent and the
+        child's outgoing edges are grafted onto that parent over the same genomic
+        span. If multiple removed edges are stacked, edges are grafted to the nearest
+        ancestor that remains connected. Edges carrying mutations cannot be removed;
+        move or delete those mutations first. Removing an edge whose child is a sample
+        node, including an internal sample, can change that sample's genotype by
+        disconnecting it from mutations on its ancestral path. Removing only a subset
+        of edges returned by :meth:`unsupported_edges` is intended to preserve sample
+        genotypes; arbitrary edge selections are not guaranteed to do so.
 
         :param tskit.TreeSequence ts: The tree sequence to modify.
-        :param list edge_id_remove_list: A list (or other iterable) of integer edge IDs
-            to remove.
+        :param iterable edge_id_remove_list: Integer edge IDs to remove.
         :return: A new tree sequence with the specified edges removed.
         :rtype: tskit.TreeSequence
 
         See https://github.com/tskit-dev/tskit/discussions/2926
         """
-        edges_to_remove_by_child = collections.defaultdict(list)
-        edge_id_remove_list = set(edge_id_remove_list)
+        edge_ids_to_remove = set()
+        for edge_id in edge_id_remove_list:
+            try:
+                edge_id = operator.index(edge_id)
+            except TypeError as error:
+                raise TypeError("edge IDs must be integers") from error
+            if edge_id < 0 or edge_id >= ts.num_edges:
+                raise ValueError(f"Edge ID {edge_id} is out of bounds")
+            edge_ids_to_remove.add(edge_id)
+
+        if len(edge_ids_to_remove) == 0:
+            return ts.dump_tables().tree_sequence()
+
         for m in ts.mutations():
-            if m.edge in edge_id_remove_list:
+            if m.edge in edge_ids_to_remove:
                 raise ValueError(
                     "Cannot remove edges that have associated mutations"
                 )
-        for remove_edge in edge_id_remove_list:
-            e = ts.edge(remove_edge)
-            edges_to_remove_by_child[e.child].append(e)
 
-        # sort left-to-right for each child
-        for k, v in edges_to_remove_by_child.items():
-            edges_to_remove_by_child[k] = sorted(v, key=lambda e: e.left)
-            # check no overlaps
-            for e1, e2 in zip(
-                edges_to_remove_by_child[k], edges_to_remove_by_child[k][1:]
-            ):
-                assert e1.right <= e2.left
+        edges_to_remove_by_child = collections.defaultdict(list)
+        for edge_id in edge_ids_to_remove:
+            edge = ts.edge(edge_id)
+            edges_to_remove_by_child[edge.child].append(edge)
+        for edges in edges_to_remove_by_child.values():
+            edges.sort(key=lambda edge: edge.left)
+            for previous, current in itertools.pairwise(edges):
+                assert previous.right <= current.left
 
-        # Sanity check: this means the topmost node will deal with modified edges
-        # left at the end
+        # Edge order is bottom-up in parent time: descendants are processed before
+        # ancestors, so grafted edges are queued before their new parent is visited.
         assert ts.edge(-1).parent not in edges_to_remove_by_child
 
-        new_edges = collections.defaultdict(list)
         tables = ts.dump_tables()
         tables.edges.clear()
-        # Edges are sorted by parent time, youngest first, so we can iterate over
-        # nodes-as-parents visiting children before parents by using itertools.groupby
-        for parent_id, ts_edges in itertools.groupby(
-            ts.edges(), lambda e: e.parent
+        new_edges = collections.defaultdict(list)
+        for parent_id, parent_edges in itertools.groupby(
+            ts.edges(), key=lambda edge: edge.parent
         ):
-            # Iterate through the ts edges *plus* the polytomy edges we created in
-            # previous steps. This allows re-editing polytomy edges when edges_to_remove
-            # are stacked.
-            edges = list(ts_edges)
+            edges = list(parent_edges)
             if parent_id in new_edges:
                 edges += new_edges.pop(parent_id)
             if parent_id in edges_to_remove_by_child:
-                for e in edges:
-                    assert parent_id == e.parent
-                    l = -1
-                    if e.id in edge_id_remove_list:
+                target_edges = edges_to_remove_by_child[parent_id]
+                for edge in edges:
+                    assert parent_id == edge.parent
+                    if edge.id in edge_ids_to_remove:
                         continue
-                    for target_edge in edges_to_remove_by_child[parent_id]:
-                        assert target_edge.left > l
-                        l = target_edge.left
-                        if e.left >= target_edge.right:
-                            # target edge is entirely to the LHS of edge e
-                            continue
-                        elif e.right <= target_edge.left:
-                            # target edge is entirely to the RHS of edge e
-                            tables.edges.append(e)
-                            e = None
+                    remaining_edge = edge
+                    previous_target_left = -1
+                    for target_edge in target_edges:
+                        assert target_edge.left > previous_target_left
+                        previous_target_left = target_edge.left
+                        if remaining_edge is None:
                             break
+                        if remaining_edge.left >= target_edge.right:
+                            continue
+                        if remaining_edge.right <= target_edge.left:
+                            tables.edges.append(remaining_edge)
+                            remaining_edge = None
+                            break
+                        if remaining_edge.left < target_edge.left:
+                            tables.edges.append(
+                                remaining_edge.replace(right=target_edge.left)
+                            )
+                            remaining_edge = remaining_edge.replace(
+                                left=target_edge.left
+                            )
+                        if remaining_edge.right > target_edge.right:
+                            assert remaining_edge.left < target_edge.right
+                            new_edges[target_edge.parent].append(
+                                remaining_edge.replace(
+                                    right=target_edge.right,
+                                    parent=target_edge.parent,
+                                )
+                            )
+                            remaining_edge = remaining_edge.replace(
+                                left=target_edge.right
+                            )
                         else:
-                            # edge e overlaps with current target edge
-                            if e.left < target_edge.left:
-                                tables.edges.add_row(
-                                    left=e.left,
-                                    right=target_edge.left,
-                                    parent=e.parent,
-                                    child=e.child,
-                                )
-                                e = e.replace(left=target_edge.left)
-                            if e.right > target_edge.right:
-                                assert e.left < target_edge.right
-                                new_edges[target_edge.parent].append(
-                                    e.replace(
-                                        right=target_edge.right,
-                                        parent=target_edge.parent,
-                                    )
-                                )
-                                e = e.replace(left=target_edge.right)
-                            else:
-                                assert e.left < e.right
-                                new_edges[target_edge.parent].append(
-                                    e.replace(parent=target_edge.parent)
-                                )
-                                e = None
-                                break
-                    if e is not None:
-                        tables.edges.append(e)
+                            assert remaining_edge.left < remaining_edge.right
+                            new_edges[target_edge.parent].append(
+                                remaining_edge.replace(parent=target_edge.parent)
+                            )
+                            remaining_edge = None
+                            break
+                    if remaining_edge is not None:
+                        tables.edges.append(remaining_edge)
             else:
-                for e in edges:
-                    if e.id not in edge_id_remove_list:
-                        tables.edges.append(e)
+                for edge in edges:
+                    if edge.id not in edge_ids_to_remove:
+                        tables.edges.append(edge)
+
         assert len(new_edges) == 0
+
         tables.sort()
         return tables.tree_sequence()
+
+    @staticmethod
+    def unsupported_edges(ts, *, per_interval=False):
+        """
+        Return edge IDs without a mutation, excluding edges above samples.
+
+        Edges carrying mutations are considered supported because removing them could
+        change the states inherited by their descendant samples. Edges whose child is a
+        sample node are also considered supported, even if they carry no mutation,
+        because removing them could disconnect the sample from mutations on its
+        ancestral path.
+
+        By default, if any genomic segment of a parent-child relationship has a
+        mutation, all segments for that relationship are considered supported. If
+        ``per_interval`` is True, each segment of an edge is considered independently.
+
+        :param tskit.TreeSequence ts: The tree sequence to inspect.
+        :param bool per_interval: Whether support is assessed per genomic edge interval
+            rather than across the whole parent-child relationship.
+        :return: The IDs of unsupported edges.
+        :rtype: numpy.ndarray
+
+        See https://github.com/tskit-dev/tskit/discussions/2926
+        """
+        unsupported = np.ones(ts.num_edges, dtype=bool)
+        sample_nodes = set(ts.samples())
+        if ts.num_edges == 0:
+            return np.array([], dtype=np.intp)
+
+        mutation_edges = {m.edge for m in ts.mutations() if m.edge != tskit.NULL}
+        if mutation_edges:
+            unsupported[list(mutation_edges)] = False
+        unsupported[np.isin(ts.edges_child, list(sample_nodes))] = False
+
+        if not per_interval:
+            supported_relationships = {
+                (ts.edge(edge_id).parent, ts.edge(edge_id).child)
+                for edge_id in np.flatnonzero(~unsupported)
+            }
+            unsupported = np.array(
+                [
+                    (parent, child) not in supported_relationships
+                    for parent, child in zip(ts.edges_parent, ts.edges_child)
+                ],
+                dtype=bool,
+            )
+
+        return np.flatnonzero(unsupported)

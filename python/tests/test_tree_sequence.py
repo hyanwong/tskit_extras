@@ -124,17 +124,7 @@ class TestRemoveEdges:
     """Tests for remove_edges (discussion #2926)."""
 
     def _unsupported_edges(self, ts, per_interval=False):
-        edges_to_remove = np.ones(ts.num_edges, dtype="bool")
-        edges_to_remove[[m.edge for m in ts.mutations()]] = False
-        edges_to_remove[np.isin(ts.edges_child, ts.samples())] = False
-        if per_interval:
-            return np.where(edges_to_remove)[0]
-        keep = ~edges_to_remove
-        for p, c in zip(ts.edges_parent[keep], ts.edges_child[keep]):
-            edges_to_remove[
-                np.logical_and(ts.edges_parent == p, ts.edges_child == c)
-            ] = False
-        return np.where(edges_to_remove)[0]
+        return tsx.unsupported_edges(ts, per_interval=per_interval)
 
     def test_raises_on_mutation_on_removed_edge(self):
         ts = get_ts_with_mutations()
@@ -156,10 +146,36 @@ class TestRemoveEdges:
             del_edges = self._unsupported_edges(ts)
             poly_ts = tsx.remove_edges(ts, del_edges)
             assert ts.num_trees == poly_ts.num_trees
+            np.testing.assert_array_equal(
+                ts.genotype_matrix(), poly_ts.genotype_matrix()
+            )
             for t1, t2 in zip(ts.trees(), poly_ts.trees()):
                 assert set(t1.roots) == set(t2.roots)
                 for node in t2.nodes():
                     assert set(t1.samples(node)) == set(t2.samples(node))
+
+    def test_removing_edge_above_sample_can_change_genotypes(self):
+        tables = tskit.TableCollection(sequence_length=1)
+        sample_a = tables.nodes.add_row(flags=tskit.NODE_IS_SAMPLE, time=0)
+        sample_b = tables.nodes.add_row(flags=tskit.NODE_IS_SAMPLE, time=0)
+        parent = tables.nodes.add_row(time=1)
+        root = tables.nodes.add_row(time=2)
+        tables.edges.add_row(0, 1, parent, sample_a)
+        tables.edges.add_row(0, 1, parent, sample_b)
+        tables.edges.add_row(0, 1, root, parent)
+        site = tables.sites.add_row(position=0.5, ancestral_state="A")
+        tables.mutations.add_row(site=site, node=parent, derived_state="G")
+        tables.sort()
+        ts = tables.tree_sequence()
+        edge_to_sample = next(
+            edge.id for edge in ts.edges() if edge.child == sample_a
+        )
+
+        assert edge_to_sample not in tsx.unsupported_edges(ts)
+        assert ts.genotype_matrix().tolist() == [[1, 1]]
+        collapsed = tsx.remove_edges(ts, [edge_to_sample])
+
+        assert collapsed.genotype_matrix().tolist() == [[tskit.MISSING_DATA, 1]]
 
     def test_remove_no_edges(self):
         ts = get_ts_with_mutations()
@@ -171,3 +187,108 @@ class TestRemoveEdges:
         result = tsx.remove_edges(ts, [])
         result2 = tsx.TreeSequence.remove_edges(ts, [])
         assert result.num_edges == result2.num_edges
+
+    def test_remove_stacked_edges_over_partial_intervals(self):
+        tables = tskit.TableCollection(sequence_length=10)
+        a = tables.nodes.add_row(flags=tskit.NODE_IS_SAMPLE, time=0)
+        b = tables.nodes.add_row(flags=tskit.NODE_IS_SAMPLE, time=0)
+        child = tables.nodes.add_row(time=1)
+        parent = tables.nodes.add_row(time=2)
+        root = tables.nodes.add_row(time=3)
+        for sample in (a, b):
+            tables.edges.add_row(0, 10, child, sample)
+        tables.edges.add_row(0, 10, parent, child)
+        tables.edges.add_row(0, 5, root, parent)
+        tables.edges.add_row(5, 10, root, parent)
+        tables.sort()
+        ts = tables.tree_sequence()
+
+        reverse_order = np.arange(ts.num_nodes)[::-1]
+        inverse_node_map = np.empty(ts.num_nodes, dtype=int)
+        inverse_node_map[np.argsort(reverse_order)] = np.arange(ts.num_nodes)
+        for input_ts, node_map in (
+            (ts, np.arange(ts.num_nodes)),
+            (tsx.reorder_nodes(ts, reverse_order), inverse_node_map),
+        ):
+            remove = [
+                edge.id
+                for edge in input_ts.edges()
+                if (edge.parent, edge.child)
+                == (node_map[parent], node_map[child])
+                or (
+                    (edge.parent, edge.child)
+                    == (node_map[root], node_map[parent])
+                    and edge.left == 0
+                )
+            ]
+            result = tsx.remove_edges(input_ts, remove)
+            expected = {
+                (node_map[root], node_map[a], 0, 5),
+                (node_map[root], node_map[b], 0, 5),
+                (node_map[root], node_map[parent], 5, 10),
+                (node_map[parent], node_map[a], 5, 10),
+                (node_map[parent], node_map[b], 5, 10),
+            }
+            assert {
+                (e.parent, e.child, e.left, e.right) for e in result.edges()
+            } == expected
+            for position in (2.5, 7.5):
+                tree = result.at(position)
+                assert set(tree.samples(tree.root)) == {
+                    node_map[a],
+                    node_map[b],
+                }
+
+    def test_remove_edges_empty_and_validate_edge_ids(self):
+        tables = tskit.TableCollection(sequence_length=1)
+        ts = tables.tree_sequence()
+        assert tsx.remove_edges(ts, []).num_edges == 0
+        assert len(tsx.unsupported_edges(ts)) == 0
+
+        ts = get_simple_ts()
+        with pytest.raises(ValueError, match="out of bounds"):
+            tsx.remove_edges(ts, [-1])
+        with pytest.raises(ValueError, match="out of bounds"):
+            tsx.remove_edges(ts, [ts.num_edges])
+        with pytest.raises(TypeError, match="must be integers"):
+            tsx.remove_edges(ts, [1.5])
+
+    def test_unsupported_edges_per_interval_or_relationship(self):
+        tables = tskit.TableCollection(sequence_length=10)
+        sample_a = tables.nodes.add_row(flags=tskit.NODE_IS_SAMPLE, time=0)
+        sample_b = tables.nodes.add_row(flags=tskit.NODE_IS_SAMPLE, time=0)
+        parent = tables.nodes.add_row(time=1)
+        root = tables.nodes.add_row(time=2)
+        tables.edges.add_row(0, 5, parent, sample_a)
+        tables.edges.add_row(5, 10, parent, sample_a)
+        tables.edges.add_row(0, 10, parent, sample_b)
+        tables.edges.add_row(0, 5, root, parent)
+        tables.edges.add_row(5, 10, root, parent)
+        site = tables.sites.add_row(position=2, ancestral_state="A")
+        tables.mutations.add_row(site=site, node=sample_a, derived_state="G")
+        tables.sort()
+        ts = tables.tree_sequence()
+
+        by_interval = set(tsx.unsupported_edges(ts, per_interval=True))
+        by_relationship = set(tsx.unsupported_edges(ts))
+        assert len(by_interval) == 2
+        assert len(by_relationship) == 2
+        assert {
+            (ts.edge(edge_id).parent, ts.edge(edge_id).child)
+            for edge_id in by_relationship
+        } == {(root, parent)}
+        assert {
+            (ts.edge(edge_id).parent, ts.edge(edge_id).child,
+             ts.edge(edge_id).left, ts.edge(edge_id).right)
+            for edge_id in by_interval
+        } == {
+            (root, parent, 0, 5),
+            (root, parent, 5, 10),
+        }
+
+    def test_unsupported_edges_alias(self):
+        ts = get_ts_with_mutations()
+        np.testing.assert_array_equal(
+            tsx.unsupported_edges(ts),
+            tsx.TreeSequence.unsupported_edges(ts),
+        )
