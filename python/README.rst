@@ -14,7 +14,9 @@ objects are accessed through their corresponding namespace, such as
 ``tsx.TreeNode.all_binary_trees(leaf_labels)`` method lazily yields every
 rooted binary resolution of the labelled polytomy. For a full
 :class:`tskit.Tree`, ``tsx.Tree.all_binary_resolutions(tree)`` lazily yields
-trees for all combinations of its polytomies.
+trees for all combinations of its polytomies. The
+``tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, alleles)``
+method returns the minimum parsimony score over those binary refinements.
 
 Usage
 -----
@@ -53,6 +55,11 @@ Usage
     for resolved_tree in tsx.Tree.all_binary_resolutions(tree):
         process(resolved_tree)
 
+    # Score observed sample states over all binary refinements
+    score = tsx.Tree.optimal_tree_refinement_parsimony_score(
+        tree, genotypes, alleles
+    )
+
 ``remove_edges`` rejects edges carrying mutations. Removing an edge above a sample
 node (including an internal sample) can also change that sample's genotype by
 disconnecting it from mutations on its ancestral path. Removing only a subset of
@@ -78,3 +85,6 @@ Functions
   (`discussion #2657 <https://github.com/tskit-dev/tskit/discussions/2657>`_)
 - ``TreeNode.all_binary_trees(leaf_labels)`` — yield all rooted binary resolutions of a polytomy
 - ``Tree.all_binary_resolutions(tree)`` — yield all combinations resolving a tskit Tree
+- ``Tree.optimal_tree_refinement_parsimony_score(
+  tree, genotypes, alleles, ancestral_state=None)`` —
+  minimum parsimony score over all binary refinements
