@@ -1,0 +1,38 @@
+title: tskit_extras documentation
+author: tskit_extras contributors
+only_build_toc_files: true
+
+execute:
+  execute_notebooks: force
+  timeout: 120
+
+repository:
+  url: https://github.com/hyanwong/tskit_extras
+  branch: main
+  path_to_book: docs
+
+html:
+  use_issues_button: true
+  use_repository_button: true
+  use_edit_page_button: true
+
+sphinx:
+  extra_extensions:
+    - sphinx.ext.autodoc
+    - sphinx.ext.autosummary
+    - sphinx.ext.intersphinx
+    - sphinx.ext.viewcode
+    - sphinx_autodoc_typehints
+  config:
+    html_theme: sphinx_book_theme
+    autodoc_member_order: bysource
+    autodoc_typehints: none
+    autosummary_generate: true
+    intersphinx_mapping:
+      tskit: ["https://tskit.dev/tskit/docs/stable/", null]
+      numpy: ["https://numpy.org/doc/stable/", null]
+    nitpick_ignore_regex:
+      - [py:class, "^(array_like|iterable)$"]
+      - [py:class, "^tskit\\.combinatorics\\.TreeNode$"]
+      - [py:meth, "^tskit\\.combinatorics\\.TreeNode\\.random_binary_tree$"]
+      - [py:meth, "^tskit\\.TreeSequence\\.sort$"]

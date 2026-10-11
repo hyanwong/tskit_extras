@@ -4,6 +4,8 @@
 
 Extra utility functions on top of [tskit](https://tskit.dev/tskit).
 
+[Online documentation](https://hyanwong.github.io/tskit_extras/) | [Build the book locally](docs/README.md)
+
 These routines are considered too complex or not fully tested enough for
 inclusion in core tskit, but are tested and ready to use. They can also serve
 as a repository of useful "snippets" that could be reused elsewhere.

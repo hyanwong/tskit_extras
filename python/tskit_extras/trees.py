@@ -8,7 +8,8 @@ import tskit
 
 class TreeNode:
     """
-    Utilities for constructing tree topologies as :class:`tskit.TreeNode` objects.
+    Utilities for constructing tree topologies as
+    :class:`tskit.combinatorics.TreeNode` objects.
     """
 
     @staticmethod
