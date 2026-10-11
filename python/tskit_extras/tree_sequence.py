@@ -234,3 +234,53 @@ class TreeSequence:
             )
 
         return np.flatnonzero(unsupported)
+
+    @staticmethod
+    def remove_root_mutations(ts):
+        """
+        Remove mutations on local roots by changing site ancestral states.
+
+        For each site, mutations on non-isolated local roots are removed and their
+        final inherited state is used as the site's ancestral state. Mutations on
+        other nodes are retained, and mutation parents are recomputed. If local roots
+        at a site inherit different states, a single ancestral state cannot represent
+        the result and a :class:`ValueError` is raised.
+
+        Sample genotypes are preserved, but removed mutations (including their
+        metadata) are not retained.
+
+        :param tskit.TreeSequence ts: The tree sequence to modify.
+        :return: A new tree sequence without mutations above local roots.
+        :rtype: tskit.TreeSequence
+
+        See https://tskit.dev/tutorials/advanced_simplification.html#removing-mutations-above-the-root
+        """
+        tables = ts.dump_tables()
+        tables.sites.clear()
+        tables.mutations.clear()
+        for tree in ts.trees():
+            for site in tree.sites():
+                ancestral_state = site.ancestral_state
+                root_states = {
+                    root: ancestral_state
+                    for root in tree.roots
+                    if not tree.is_isolated(root)
+                }
+                for mutation in site.mutations:
+                    if mutation.node in root_states:
+                        root_states[mutation.node] = mutation.derived_state
+                    else:
+                        tables.mutations.append(mutation.replace(parent=tskit.NULL))
+
+                if root_states:
+                    states = set(root_states.values())
+                    if len(states) != 1:
+                        raise ValueError(
+                            "Multiple roots with different inherited states "
+                            f"exist for the site at position {site.position}"
+                        )
+                    ancestral_state = states.pop()
+                tables.sites.append(site.replace(ancestral_state=ancestral_state))
+
+        tables.compute_mutation_parents()
+        return tables.tree_sequence()

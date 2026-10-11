@@ -48,6 +48,9 @@ Usage
     unsupported = tsx.unsupported_edges(ts, per_interval=True)
     polytomy_ts = tsx.remove_edges(ts, unsupported)
 
+    # Remove mutations above local roots, preserving sample genotypes
+    ts_no_root_mutations = tsx.remove_root_mutations(ts)
+
     # Unsquash edges in an EdgeTable
     tsx.EdgeTable.unsquash(ts.dump_tables().edges, positions=[0.3, 0.7])
 
@@ -72,6 +75,9 @@ arbitrary edge selections are not guaranteed to do so. ``unsupported_edges`` exc
 both mutation-bearing edges and edges whose child is a sample. By default, support is
 assessed across all genomic segments connecting a parent-child pair; set
 ``per_interval=True`` to assess each segment independently.
+``remove_root_mutations`` moves the inherited state at each local root into the
+site's ancestral state and removes those root mutations. It raises an error if the
+local roots at a site inherit different states.
 
 Functions
 ---------
@@ -89,6 +95,8 @@ namespace is intended for such utilities, rather than as a general catch-all.
   (`issue #3 <https://github.com/hyanwong/tskit_extras/issues/3>`_)
 - ``remove_edges(ts, edge_id_remove_list)`` — create polytomies by removing edges
   (`discussion #2926 <https://github.com/tskit-dev/tskit/discussions/2926>`_)
+- ``remove_root_mutations(ts)`` — remove mutations above local roots
+  (`advanced simplification tutorial <https://tskit.dev/tutorials/advanced_simplification.html#removing-mutations-above-the-root>`_)
 - ``unsupported_edges(ts, per_interval=False)`` — find edges without mutations,
   excluding edges above samples
   (`discussion #2926 <https://github.com/tskit-dev/tskit/discussions/2926>`_)

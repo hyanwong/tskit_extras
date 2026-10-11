@@ -21,6 +21,7 @@ def test_module_exports():
         "arg_num_children",
         "utils",
         "remove_edges",
+        "remove_root_mutations",
         "unsupported_edges",
         "TreeSequence",
         "TableCollection",
