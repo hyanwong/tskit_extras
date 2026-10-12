@@ -20,7 +20,8 @@ Standalone functions, such as those that operate on arrays, are stored in the
 [`.utils.invert_map`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.utils.invert_map).
 
 We recommend that you `import tskit_extras as tsx`, and as a convenient shortcut,
-functions that operate on a `tskit.TreeSequence` object
+functions that operate on a
+[`tskit.TreeSequence`](https://tskit.dev/tskit/docs/stable/python-api.html#tskit.TreeSequence) object
 have direct top-level aliases. E.g.
 [`tsx.TreeSequence.reorder_nodes(ts, order)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.reorder_nodes)
 can equally be called as
