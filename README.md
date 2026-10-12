@@ -79,7 +79,7 @@ for resolved_tree in tsx.Tree.all_binary_resolutions(tree):
 score = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, alleles)
 ```
 
-## Functions
+## Functions and methods
 
 | Function | Description | Source discussion |
 |---|---|---|
@@ -89,7 +89,11 @@ score = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, allele
 | [`remove_root_mutations(ts)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.remove_root_mutations) | Remove mutations above local roots | [advanced simplification tutorial](https://tskit.dev/tutorials/advanced_simplification.html#removing-mutations-above-the-root) |
 | [`unsupported_edges(ts, per_interval=False)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.unsupported_edges) | Find edges without mutations, excluding edges above samples | [#2926](https://github.com/tskit-dev/tskit/discussions/2926) |
 | [`utils.invert_map(node_mapping)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.utils.invert_map) | Invert a simplify node map | [#3](https://github.com/hyanwong/tskit_extras/issues/3) |
+| [`TableCollection.reorder_nodes(tables, order)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TableCollection.reorder_nodes) | Reorder nodes in a TableCollection | — |
 | [`EdgeTable.unsquash(edge_table, positions)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.EdgeTable.unsquash) | Opposite of [`EdgeTable.squash()`](https://tskit.dev/tskit/docs/stable/python-api.html#tskit.EdgeTable.squash) | [#2657](https://github.com/tskit-dev/tskit/discussions/2657) |
+| [`TreeNode.all_binary_trees(leaf_labels)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeNode.all_binary_trees) | Enumerate all rooted binary resolutions of a polytomy | — |
+| [`Tree.all_binary_resolutions(tree)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.Tree.all_binary_resolutions) | Enumerate all binary resolutions of a tskit Tree | — |
+| [`Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, alleles, ancestral_state=None)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.Tree.optimal_tree_refinement_parsimony_score) | Minimum parsimony score over all binary refinements | — |
 
 The TreeSequence functions are also available through the TreeSequence namespace:
 - [`tsx.TreeSequence.reorder_nodes(ts, order)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.reorder_nodes)
