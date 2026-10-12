@@ -81,35 +81,73 @@ score = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, allele
 
 ## Functions and methods
 
-### Top-level functions
-
-| Function | Description | Source discussion |
-|---|---|---|
-| [`arg_num_children(ts)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.arg_num_children) | Count unique children per parent in the ARG | [#3449](https://github.com/tskit-dev/tskit/discussions/3449) |
-| [`remove_edges(ts, edge_id_remove_list)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.remove_edges) | Create polytomies by removing edges | [#2926](https://github.com/tskit-dev/tskit/discussions/2926) |
-| [`remove_root_mutations(ts)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.remove_root_mutations) | Remove mutations above local roots | [advanced simplification tutorial](https://tskit.dev/tutorials/advanced_simplification.html#removing-mutations-above-the-root) |
-| [`reorder_nodes(ts, order)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.reorder_nodes) | Reorder nodes in a tree sequence | [#3466](https://github.com/tskit-dev/tskit/discussions/3466) |
-| [`unsupported_edges(ts, per_interval=False)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.unsupported_edges) | Find edges without mutations, excluding edges above samples | [#2926](https://github.com/tskit-dev/tskit/discussions/2926) |
-
-<hr>
-
-### Utility functions
-
-| Function | Description | Source discussion |
-|---|---|---|
-| [`utils.invert_map(node_mapping)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.utils.invert_map) | Invert a simplify node map | [#3](https://github.com/hyanwong/tskit_extras/issues/3) |
-
-<hr>
-
-### Functions on other tskit objects
-
-| Function | Description | Source discussion |
-|---|---|---|
-| [`EdgeTable.unsquash(edge_table, positions)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.EdgeTable.unsquash) | Opposite of [`EdgeTable.squash()`](https://tskit.dev/tskit/docs/stable/python-api.html#tskit.EdgeTable.squash) | [#2657](https://github.com/tskit-dev/tskit/discussions/2657) |
-| [`TableCollection.reorder_nodes(tables, order)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TableCollection.reorder_nodes) | Reorder nodes in a TableCollection | — |
-| [`Tree.all_binary_resolutions(tree)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.Tree.all_binary_resolutions) | Enumerate all binary resolutions of a tskit Tree | — |
-| [`Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, alleles, ancestral_state=None)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.Tree.optimal_tree_refinement_parsimony_score) | Minimum parsimony score over all binary refinements | — |
-| [`TreeNode.all_binary_trees(leaf_labels)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeNode.all_binary_trees) | Enumerate all rooted binary resolutions of a polytomy | — |
+<table>
+<thead>
+<tr><th>Function</th><th>Description</th><th>Source discussion</th></tr>
+</thead>
+<tbody>
+<tr><th colspan="3" scope="rowgroup">Top-level functions</th></tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.arg_num_children"><code>arg_num_children(ts)</code></a></td>
+<td>Count unique children per parent in the ARG</td>
+<td><a href="https://github.com/tskit-dev/tskit/discussions/3449">#3449</a></td>
+</tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.remove_edges"><code>remove_edges(ts, edge_id_remove_list)</code></a></td>
+<td>Create polytomies by removing edges</td>
+<td><a href="https://github.com/tskit-dev/tskit/discussions/2926">#2926</a></td>
+</tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.remove_root_mutations"><code>remove_root_mutations(ts)</code></a></td>
+<td>Remove mutations above local roots</td>
+<td><a href="https://tskit.dev/tutorials/advanced_simplification.html#removing-mutations-above-the-root">Advanced simplification tutorial</a></td>
+</tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.reorder_nodes"><code>reorder_nodes(ts, order)</code></a></td>
+<td>Reorder nodes in a tree sequence</td>
+<td><a href="https://github.com/tskit-dev/tskit/discussions/3466">#3466</a></td>
+</tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.unsupported_edges"><code>unsupported_edges(ts, per_interval=False)</code></a></td>
+<td>Find edges without mutations, excluding edges above samples</td>
+<td><a href="https://github.com/tskit-dev/tskit/discussions/2926">#2926</a></td>
+</tr>
+<tr><td colspan="3"><hr></td></tr>
+<tr><th colspan="3" scope="rowgroup">Utility functions</th></tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.utils.invert_map"><code>utils.invert_map(node_mapping)</code></a></td>
+<td>Invert a simplify node map</td>
+<td><a href="https://github.com/hyanwong/tskit_extras/issues/3">#3</a></td>
+</tr>
+<tr><td colspan="3"><hr></td></tr>
+<tr><th colspan="3" scope="rowgroup">Functions on other tskit objects</th></tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.EdgeTable.unsquash"><code>EdgeTable.unsquash(edge_table, positions)</code></a></td>
+<td>Opposite of <a href="https://tskit.dev/tskit/docs/stable/python-api.html#tskit.EdgeTable.squash"><code>EdgeTable.squash()</code></a></td>
+<td><a href="https://github.com/tskit-dev/tskit/discussions/2657">#2657</a></td>
+</tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TableCollection.reorder_nodes"><code>TableCollection.reorder_nodes(tables, order)</code></a></td>
+<td>Reorder nodes in a TableCollection</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.Tree.all_binary_resolutions"><code>Tree.all_binary_resolutions(tree)</code></a></td>
+<td>Enumerate all binary resolutions of a tskit Tree</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.Tree.optimal_tree_refinement_parsimony_score"><code>Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, alleles, ancestral_state=None)</code></a></td>
+<td>Minimum parsimony score over all binary refinements</td>
+<td>—</td>
+</tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeNode.all_binary_trees"><code>TreeNode.all_binary_trees(leaf_labels)</code></a></td>
+<td>Enumerate all rooted binary resolutions of a polytomy</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
 
 The TreeSequence functions are also available through the TreeSequence namespace:
 - [`tsx.TreeSequence.reorder_nodes(ts, order)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.reorder_nodes)
