@@ -98,12 +98,16 @@ The TreeSequence functions are also available through the TreeSequence namespace
 - [`tsx.TreeSequence.remove_root_mutations(ts)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.remove_root_mutations)
 - [`tsx.TreeSequence.unsupported_edges(ts, per_interval=False)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.unsupported_edges)
 
+### General utilities
+
 Helpers that do not operate on a particular tskit object are grouped in
 `tsx.utils`; for example,
 [`tsx.utils.invert_map(node_mapping)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.utils.invert_map)
-inverts a simplify node map. This module is for standalone utilities, rather than
-a general catch-all. Helpers for specific non-TreeSequence objects are available
-through their namespaces:
+inverts a simplify node map. 
+
+### Functions that operate on other _tskit_ objects
+
+Helpers for specific non-TreeSequence objects are available through their namespaces:
 - [`tsx.utils.invert_map(node_mapping)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.utils.invert_map)
 - [`tsx.TableCollection.reorder_nodes(tables, order)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TableCollection.reorder_nodes)
 - [`tsx.EdgeTable.unsquash(edge_table, positions)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.EdgeTable.unsquash)
