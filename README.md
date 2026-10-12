@@ -79,21 +79,6 @@ for resolved_tree in tsx.Tree.all_binary_resolutions(tree):
 score = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, alleles)
 ```
 
-[`remove_edges`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.remove_edges)
-rejects edges carrying mutations. Removing an edge above a sample node
-(including an internal sample) can also change that sample's genotype by disconnecting
-it from mutations on its ancestral path. Removing only a subset of edges returned by
-[`unsupported_edges`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.unsupported_edges)
-is intended to preserve sample genotypes; arbitrary edge selections are not guaranteed
-to do so. [`unsupported_edges`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.unsupported_edges)
-excludes both mutation-bearing edges and edges whose child is a sample. By default,
-support is assessed across all genomic segments connecting a parent-child pair; set
-`per_interval=True` to assess each segment independently.
-[`remove_root_mutations`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.remove_root_mutations)
-moves the inherited state at each local root into the site's ancestral state and
-removes those root mutations. It raises an error if the local roots at a site inherit
-different states.
-
 ## Functions
 
 | Function | Description | Source discussion |
