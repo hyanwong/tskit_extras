@@ -203,10 +203,18 @@ python/              # Python package
 
 ```bash
 cd python
-pip install -e ".[dev]"
+python -m venv .venv
+.venv/bin/python -m pip install -e ".[dev]"
 pytest tests/
-ruff check tskit_extras/ tests/
+cd ..
+make lint
+make install-hooks
 ```
+
+`make lint` runs the Ruff version pinned in the `lint` dependency group in
+`python/pyproject.toml` using the local `python/.venv` environment.
+`make install-hooks` configures this clone to run Ruff before every commit,
+including commits made in GitHub Desktop. Run it once per clone.
 
 ## Contributing
 

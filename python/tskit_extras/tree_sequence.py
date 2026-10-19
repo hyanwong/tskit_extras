@@ -75,12 +75,14 @@ class TreeSequence:
         in the graph, regardless of whether those descendants have ``node``
         as a genetic ancestor in any local tree.
 
-        Note that this builds arrays of starts and ends of the child edges for
-        each node, which can also be done by using tskit.jit.numba.NumbaTreeSequence
+        Note that this builds arrays of starts and ends of the child edges for each
+        node, which can also be done by using tskit.jit.numba.NumbaTreeSequence
         for potentially faster descendant queries.
         """
         if node < 0:
-            raise ValueError("Negative node IDs are disallowed; did you pass tskit.NULL?")
+            raise ValueError(
+                "Negative node IDs are disallowed; did you pass tskit.NULL?"
+            )
 
         is_descendant = np.zeros(ts.num_nodes, dtype=bool)
         parent = ts.edges_parent
