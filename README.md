@@ -149,6 +149,8 @@ score = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, allele
 </tbody>
 </table>
 
+### TreeSequence functions
+
 The TreeSequence functions are also available through the TreeSequence namespace:
 - [`tsx.TreeSequence.reorder_nodes(ts, order)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.reorder_nodes)
 - [`tsx.TreeSequence.arg_num_children(ts)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.arg_num_children)
