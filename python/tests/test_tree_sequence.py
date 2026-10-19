@@ -292,3 +292,51 @@ class TestRemoveEdges:
             tsx.unsupported_edges(ts),
             tsx.TreeSequence.unsupported_edges(ts),
         )
+
+
+class TestGraphSamples:
+    @pytest.mark.parametrize("seed", [1, 2, 3])
+    def test_matches_graph_traversal(self, seed):
+        ts = get_simple_ts(n=6, seed=seed)
+        samples = set(ts.samples())
+        for u in range(ts.num_nodes):
+            descendants = set()
+            stack = [u]
+            while stack:
+                parent = stack.pop()
+                children = set(ts.edges_child[ts.edges_parent == parent])
+                for child in children - descendants:
+                    descendants.add(child)
+                    stack.append(child)
+            expected = descendants.intersection(samples)
+            if u in samples:
+                expected.add(u)
+            result = tsx.graph_samples(ts, u)
+            assert set(result.tolist()) == expected
+            assert tsx.num_graph_samples(ts, u) == len(expected)
+
+    def test_bad_node(self):
+        with pytest.raises(ValueError, match="Negative node IDs are disallowed"):
+            tsx.graph_samples(get_simple_ts(n=3), -1)
+
+    def test_no_edges(self):
+        tables = tskit.TableCollection(sequence_length=1)
+        tables.nodes.add_row(flags=tskit.NODE_IS_SAMPLE, time=0)
+        ts = tables.tree_sequence()
+        assert tsx.graph_samples(ts, 0).tolist() == [0]
+        with pytest.raises(IndexError):
+            tsx.graph_samples(ts, 1)
+        with pytest.raises(IndexError):
+            tsx.graph_samples(ts, 0.5)
+
+    def test_descendants_can_cross_disjoint_intervals(self):
+        tables = tskit.TableCollection(sequence_length=2)
+        tables.nodes.add_row(flags=tskit.NODE_IS_SAMPLE, time=0)
+        tables.nodes.add_row(time=1)
+        tables.nodes.add_row(time=2)
+        tables.edges.add_row(0, 1, 1, 0)
+        tables.edges.add_row(1, 2, 2, 1)
+        tables.sort()
+        ts = tables.tree_sequence()
+        assert tsx.graph_samples(ts, 2).tolist() == [0]
+        assert tsx.num_graph_samples(ts, 2) == 1

@@ -9,6 +9,8 @@ take the tree sequence as their first argument.
 ```{eval-rst}
 .. autofunction:: tskit_extras.reorder_nodes
 .. autofunction:: tskit_extras.arg_num_children
+.. autofunction:: tskit_extras.graph_samples
+.. autofunction:: tskit_extras.num_graph_samples
 .. autofunction:: tskit_extras.remove_edges
 .. autofunction:: tskit_extras.remove_root_mutations
 .. autofunction:: tskit_extras.unsupported_edges
