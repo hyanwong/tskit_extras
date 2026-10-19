@@ -69,6 +69,78 @@ class TreeSequence:
         )
 
     @staticmethod
+    def _graph_descendants(ts, node):
+        """
+        Return a boolean array marking the descendants of ``node`` anywhere
+        in the graph, regardless of whether those descendants have ``node``
+        as a genetic ancestor in any local tree.
+
+        Note that this builds arrays of starts and ends of the child edges for
+        each node, which can also be done by using tskit.jit.numba.NumbaTreeSequence
+        for potentially faster descendant queries.
+        """
+        if node < 0:
+            raise ValueError("Negative node IDs are disallowed; did you pass tskit.NULL?")
+
+        is_descendant = np.zeros(ts.num_nodes, dtype=bool)
+        parent = ts.edges_parent
+        # Edges for a given parent are contiguous in the edge table, so the child
+        # edges of each node are found from the boundaries between runs of parents.
+        child_start = np.zeros(ts.num_nodes, dtype=np.intp)
+        child_end = np.zeros(ts.num_nodes, dtype=np.intp)
+        if ts.num_edges > 0:
+            run_starts = np.flatnonzero(np.r_[True, parent[1:] != parent[:-1]])
+            run_ends = np.r_[run_starts[1:], ts.num_edges]
+            run_parents = parent[run_starts]
+            child_start[run_parents] = run_starts
+            child_end[run_parents] = run_ends
+        child = ts.edges_child
+        # Code from https://github.com/tskit-dev/tskit/discussions/2869
+
+        stack = [node]
+        while stack:
+            u = stack.pop()
+            for e in range(child_start[u], child_end[u]):
+                v = child[e]
+                if not is_descendant[v]:
+                    is_descendant[v] = True
+                    stack.append(v)
+        return is_descendant
+
+    @staticmethod
+    def graph_samples(ts, node):
+        """
+        Return the sample nodes that are graph descendants of ``node``.
+
+        Graph descendants are reachable by following edges, regardless of
+        whether the edges overlap in genomic coordinates. If ``node`` is a
+        sample, it is included in the result.
+
+        :param tskit.TreeSequence ts: The tree sequence to analyse.
+        :param int node: The node ID.
+        :return: A sorted array of sample node IDs.
+        :rtype: numpy.ndarray
+        """
+        is_descendant = TreeSequence._graph_descendants(ts, node)
+        if ts.nodes_flags[node] & tskit.NODE_IS_SAMPLE:
+            is_descendant[node] = True
+        samples = ts.samples()
+        return samples[is_descendant[samples]]
+
+    @staticmethod
+    def num_graph_samples(ts, node):
+        """
+        Return the number of sample nodes graph-reachable from ``node``,
+        including ``node`` if it is a sample.
+
+        :param tskit.TreeSequence ts: The tree sequence to analyse.
+        :param int node: The node ID.
+        :return: The number of descendant samples.
+        :rtype: int
+        """
+        return len(TreeSequence.graph_samples(ts, node))
+
+    @staticmethod
     def remove_edges(ts, edge_id_remove_list):
         """
         Create polytomies by removing edges from a tree sequence.

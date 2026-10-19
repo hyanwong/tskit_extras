@@ -50,6 +50,10 @@ tsx.TableCollection.reorder_nodes(tables, order=-tables.nodes.time)
 # Count children per parent node across the ARG
 n_children = tsx.arg_num_children(ts)
 
+# Find samples graph-reachable from a node, and count them
+samples = tsx.graph_samples(ts, node)
+n_graph_samples = tsx.num_graph_samples(ts, node)
+
 # Invert a simplify node map (index by new ID to obtain the original ID)
 simplified_ts, node_map = ts.simplify(samples=ts.samples()[:4], map_nodes=True)
 reverse_map = tsx.utils.invert_map(node_map)
@@ -91,6 +95,16 @@ score = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, allele
 <td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.arg_num_children"><code>arg_num_children(ts)</code></a></td>
 <td>Count unique children per parent in the ARG</td>
 <td><a href="https://github.com/tskit-dev/tskit/discussions/3449">#3449</a></td>
+</tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.graph_samples"><code>graph_samples(ts, node)</code></a></td>
+<td>Find sample nodes graph-reachable from a node</td>
+<td><a href="https://github.com/tskit-dev/tskit/discussions/2869#discussioncomment-7535830">#2869</a></td>
+</tr>
+<tr>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.num_graph_samples"><code>num_graph_samples(ts, node)</code></a></td>
+<td>Count sample nodes graph-reachable from a node</td>
+<td><a href="https://github.com/tskit-dev/tskit/discussions/2869#discussioncomment-7535830">#2869</a></td>
 </tr>
 <tr>
 <td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.remove_edges"><code>remove_edges(ts, edge_id_remove_list)</code></a></td>
@@ -154,6 +168,8 @@ score = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, allele
 The TreeSequence functions are also available through the TreeSequence namespace:
 - [`tsx.TreeSequence.reorder_nodes(ts, order)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.reorder_nodes)
 - [`tsx.TreeSequence.arg_num_children(ts)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.arg_num_children)
+- [`tsx.TreeSequence.graph_samples(ts, node)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.graph_samples)
+- [`tsx.TreeSequence.num_graph_samples(ts, node)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.num_graph_samples)
 - [`tsx.TreeSequence.remove_edges(ts, edge_id_remove_list)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.remove_edges)
 - [`tsx.TreeSequence.remove_root_mutations(ts)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.remove_root_mutations)
 - [`tsx.TreeSequence.unsupported_edges(ts, per_interval=False)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeSequence.unsupported_edges)

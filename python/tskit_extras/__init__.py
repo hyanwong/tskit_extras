@@ -21,6 +21,8 @@ __version__ = _version.tskit_extras_version
 __all__ = [
     "reorder_nodes",
     "arg_num_children",
+    "graph_samples",
+    "num_graph_samples",
     "utils",
     "remove_edges",
     "remove_root_mutations",
@@ -56,3 +58,13 @@ def remove_root_mutations(ts):
 def unsupported_edges(ts, *, per_interval=False):
     """Alias for :meth:`TreeSequence.unsupported_edges`."""
     return TreeSequence.unsupported_edges(ts, per_interval=per_interval)
+
+
+def graph_samples(ts, node):
+    """Alias for :meth:`TreeSequence.graph_samples`."""
+    return TreeSequence.graph_samples(ts, node)
+
+
+def num_graph_samples(ts, node):
+    """Alias for :meth:`TreeSequence.num_graph_samples`."""
+    return TreeSequence.num_graph_samples(ts, node)
