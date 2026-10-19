@@ -166,7 +166,6 @@ inverts a simplify node map.
 ### Functions that operate on other _tskit_ objects
 
 Helpers for specific non-TreeSequence objects are available through their namespaces:
-- [`tsx.utils.invert_map(node_mapping)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.utils.invert_map)
 - [`tsx.TableCollection.reorder_nodes(tables, order)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TableCollection.reorder_nodes)
 - [`tsx.EdgeTable.unsquash(edge_table, positions)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.EdgeTable.unsquash)
 - [`tsx.TreeNode.all_binary_trees(leaf_labels)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeNode.all_binary_trees)
