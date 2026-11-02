@@ -79,8 +79,8 @@ for tree in tsx.TreeNode.all_binary_trees([0, 1, 2, 3]):
 for resolved_tree in tsx.Tree.all_binary_resolutions(tree):
     process(resolved_tree)
 
-# Score observed sample states over all binary refinements
-score = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, alleles)
+# Score integer-coded sample states over all binary refinements
+score = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes)
 ```
 
 ## Functions and methods
@@ -151,7 +151,7 @@ score = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, allele
 <td>—</td>
 </tr>
 <tr>
-<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.Tree.optimal_tree_refinement_parsimony_score"><code>Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, alleles, ancestral_state=None)</code></a></td>
+<td><a href="https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.Tree.optimal_tree_refinement_parsimony_score"><code>Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, alleles=None, ancestral_state=None)</code></a></td>
 <td>Minimum parsimony score over all binary refinements</td>
 <td>—</td>
 </tr>
@@ -188,7 +188,7 @@ Helpers for specific non-TreeSequence objects are available through their namesp
 - [`tsx.EdgeTable.unsquash(edge_table, positions)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.EdgeTable.unsquash)
 - [`tsx.TreeNode.all_binary_trees(leaf_labels)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.TreeNode.all_binary_trees)
 - [`tsx.Tree.all_binary_resolutions(tree)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.Tree.all_binary_resolutions)
-- [`tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, alleles, ancestral_state=None)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.Tree.optimal_tree_refinement_parsimony_score)
+- [`tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, alleles=None, ancestral_state=None)`](https://hyanwong.github.io/tskit_extras/api.html#tskit_extras.Tree.optimal_tree_refinement_parsimony_score)
 
 ## Repository structure
 

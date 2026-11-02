@@ -123,6 +123,30 @@ class TestOptimalTreeRefinementParsimonyScore:
                 )[1]
             )
 
+    def test_alleles_are_optional_for_integer_states(self):
+        tree = tskit.Tree.generate_star(4)
+        genotypes = [0, 1, 2, 0]
+        alleles = ("A", "C", "G")
+
+        assert tsx.Tree.optimal_tree_refinement_parsimony_score(
+            tree, genotypes
+        ) == tsx.Tree.optimal_tree_refinement_parsimony_score(
+            tree, genotypes, alleles
+        )
+        genotypes_without_ancestral_state = [0, 1, 0, 1]
+        assert tsx.Tree.optimal_tree_refinement_parsimony_score(
+            tree, genotypes_without_ancestral_state, ancestral_state=2
+        ) == tsx.Tree.optimal_tree_refinement_parsimony_score(
+            tree, genotypes_without_ancestral_state, alleles, ancestral_state=2
+        )
+
+    def test_string_ancestral_state_requires_alleles(self):
+        tree = tskit.Tree.generate_star(3)
+        with pytest.raises(ValueError, match="alleles must be provided"):
+            tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, [0, 1, 0], ancestral_state="A"
+            )
+
     def test_rejects_invalid_genotypes(self):
         tree = tskit.Tree.generate_star(3)
         with pytest.raises(ValueError, match="one entry for each"):
