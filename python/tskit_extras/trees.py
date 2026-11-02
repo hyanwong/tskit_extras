@@ -98,22 +98,23 @@ class Tree:
 
     @staticmethod
     def optimal_tree_refinement_parsimony_score(
-        tree, genotypes, alleles, ancestral_state=None
+        tree, genotypes, alleles=None, ancestral_state=None
     ):
         """
         Return the minimum Optimal Tree Refinement (OTR) parsimony score over all
         binary refinements of ``tree``.
 
         Genotypes are interpreted in the order of ``tree.tree_sequence.samples()``,
-        as in :meth:`tskit.Tree.map_mutations`. Missing genotypes
-        (``tskit.MISSING_DATA``) do not constrain a node. The score counts
-        equal-cost state changes, and observations on internal sample nodes are
-        included.
+        as in :meth:`tskit.Tree.map_mutations`. Genotype entries equal to
+        ``tskit.MISSING_DATA`` (``-1``) are treated as missing and do not constrain
+        the score. The score counts equal-cost state changes, and observations on
+        internal sample nodes are included.
 
         If ``ancestral_state`` is specified, it is the state immediately ancestral
         to the root(s); a change between it and a root state contributes to the
-        score. Otherwise, the ancestral state is chosen to minimize the score.
-        The input tree is not modified.
+        score. Otherwise (``ancestral_state=None``), the ancestral state is
+        chosen to minimize the score. ``tskit.MISSING_DATA`` is not a valid
+        ancestral state. The input tree is not modified.
 
         The binary-state algorithm is linear in the number of children at each
         polytomy. For more than two states, an exact subset dynamic program is used;
@@ -121,16 +122,20 @@ class Tree:
 
         :param tskit.Tree tree: The tree to score.
         :param array_like genotypes: State indexes for the tree sequence samples.
-        :param iterable alleles: The state labels indexed by ``genotypes``.
+        :param iterable alleles: Optional state labels indexed by ``genotypes``.
+            If omitted, the state space is inferred from the genotype indexes
+            and any integer ``ancestral_state``.
         :param ancestral_state: An optional ancestral state label or state index.
+            ``alleles`` must be provided when this is a string label.
         :return: The minimum number of state changes over all binary refinements.
         :rtype: int
         """
-        alleles = tuple(alleles)
-        if len(alleles) == 0:
-            raise ValueError("At least one allele is required")
-        if len(alleles) > 64:
-            raise ValueError("A maximum of 64 states is supported")
+        if alleles is not None:
+            alleles = tuple(alleles)
+            if len(alleles) == 0:
+                raise ValueError("At least one allele is required")
+            if len(alleles) > 64:
+                raise ValueError("A maximum of 64 states is supported")
 
         genotypes = tskit.util.safe_np_int_cast(genotypes, np.int8)
         if genotypes.ndim != 1:
@@ -140,23 +145,41 @@ class Tree:
             raise ValueError(
                 "genotypes must have one entry for each tree sequence sample"
             )
-        if np.any(genotypes < tskit.MISSING_DATA) or np.any(
-            genotypes >= len(alleles)
-        ):
+        if np.any(genotypes < tskit.MISSING_DATA):
+            raise ValueError("genotypes must be valid allele indexes or MISSING_DATA")
+        if alleles is not None and np.any(genotypes >= len(alleles)):
             raise ValueError("genotypes must be valid allele indexes or MISSING_DATA")
         if not np.any(genotypes != tskit.MISSING_DATA):
             raise ValueError("At least one non-missing observation must be provided")
 
         if isinstance(ancestral_state, str):
+            if alleles is None:
+                raise ValueError(
+                    "alleles must be provided when ancestral_state is a string"
+                )
             ancestral_state = alleles.index(ancestral_state)
         elif ancestral_state is not None:
             if not isinstance(ancestral_state, int | np.integer):
                 raise TypeError("ancestral_state must be an integer or allele label")
             ancestral_state = int(ancestral_state)
-            if ancestral_state < 0 or ancestral_state >= len(alleles):
+            if ancestral_state < 0 or (
+                alleles is not None and ancestral_state >= len(alleles)
+            ):
                 raise ValueError("ancestral_state not between 0 and (num_alleles-1)")
 
-        num_states = len(alleles)
+        if alleles is None:
+            max_observed_state = int(
+                np.max(genotypes[genotypes != tskit.MISSING_DATA])
+            )
+            if max_observed_state >= 64 or (
+                ancestral_state is not None and ancestral_state >= 64
+            ):
+                raise ValueError("A maximum of 64 states is supported")
+            num_states = max_observed_state + 1
+            if ancestral_state is not None:
+                num_states = max(num_states, ancestral_state + 1)
+        else:
+            num_states = len(alleles)
         sample_state = dict(zip(sample_nodes, genotypes))
         costs = [None] * tree.tree_sequence.num_nodes
 
