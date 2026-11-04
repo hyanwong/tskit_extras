@@ -113,5 +113,5 @@ namespace is intended for such utilities, rather than as a general catch-all.
 - ``TreeNode.all_binary_trees(leaf_labels)`` — yield all rooted binary resolutions of a polytomy
 - ``Tree.all_binary_resolutions(tree)`` — yield all combinations resolving a tskit Tree
 - ``Tree.optimal_tree_refinement_parsimony_score(
-  tree, genotypes, alleles=None, ancestral_state=None)`` —
+  tree, genotypes, ancestral_state=None, alleles=None)`` —
   minimum parsimony score over all binary refinements

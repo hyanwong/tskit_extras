@@ -8,6 +8,7 @@ import pytest
 import tskit
 
 import tskit_extras as tsx
+import tskit_extras.trees as trees_module
 
 
 def binary_resolution_score(tree, genotypes, alleles, ancestral_state=None):
@@ -32,7 +33,7 @@ class TestOptimalTreeRefinementParsimonyScore:
         for genotypes in itertools.product(range(2), repeat=4):
             for ancestral_state in (None, "A", "G"):
                 assert tsx.Tree.optimal_tree_refinement_parsimony_score(
-                    tree, genotypes, alleles, ancestral_state=ancestral_state
+                    tree, genotypes, alleles=alleles, ancestral_state=ancestral_state
                 ) == binary_resolution_score(
                     tree, genotypes, alleles, ancestral_state=ancestral_state
                 )
@@ -50,7 +51,7 @@ class TestOptimalTreeRefinementParsimonyScore:
         tree = tskit.Tree.generate_star(4)
         alleles = ("A", "C", "G")
         assert tsx.Tree.optimal_tree_refinement_parsimony_score(
-            tree, genotypes, alleles, ancestral_state=ancestral_state
+            tree, genotypes, alleles=alleles, ancestral_state=ancestral_state
         ) == binary_resolution_score(
             tree, genotypes, alleles, ancestral_state=ancestral_state
         )
@@ -61,7 +62,7 @@ class TestOptimalTreeRefinementParsimonyScore:
         alleles = ("A", "C", "G")
         for ancestral_state in (None, 0, 1, 2):
             assert tsx.Tree.optimal_tree_refinement_parsimony_score(
-                tree, genotypes, alleles, ancestral_state=ancestral_state
+                tree, genotypes, alleles=alleles, ancestral_state=ancestral_state
             ) == binary_resolution_score(
                 tree, genotypes, alleles, ancestral_state=ancestral_state
             )
@@ -91,7 +92,7 @@ class TestOptimalTreeRefinementParsimonyScore:
         alleles = ("A", "G")
 
         assert tsx.Tree.optimal_tree_refinement_parsimony_score(
-            tree, genotypes, alleles, ancestral_state="A"
+            tree, genotypes, alleles=alleles, ancestral_state="A"
         ) == binary_resolution_score(
             tree, genotypes, alleles, ancestral_state="A"
         )
@@ -105,7 +106,7 @@ class TestOptimalTreeRefinementParsimonyScore:
         alleles = ("A", "G")
 
         assert tsx.Tree.optimal_tree_refinement_parsimony_score(
-            tree, genotypes, alleles, ancestral_state=0
+            tree, genotypes, alleles=alleles, ancestral_state=0
         ) == binary_resolution_score(
             tree, genotypes, alleles, ancestral_state=0
         )
@@ -116,7 +117,7 @@ class TestOptimalTreeRefinementParsimonyScore:
         alleles = ("A", "G")
         for ancestral_state in (None, 0, 1):
             assert tsx.Tree.optimal_tree_refinement_parsimony_score(
-                tree, genotypes, alleles, ancestral_state=ancestral_state
+                tree, genotypes, alleles=alleles, ancestral_state=ancestral_state
             ) == len(
                 tree.map_mutations(
                     genotypes, alleles, ancestral_state=ancestral_state
@@ -131,14 +132,215 @@ class TestOptimalTreeRefinementParsimonyScore:
         assert tsx.Tree.optimal_tree_refinement_parsimony_score(
             tree, genotypes
         ) == tsx.Tree.optimal_tree_refinement_parsimony_score(
-            tree, genotypes, alleles
+            tree, genotypes, alleles=alleles
         )
         genotypes_without_ancestral_state = [0, 1, 0, 1]
         assert tsx.Tree.optimal_tree_refinement_parsimony_score(
             tree, genotypes_without_ancestral_state, ancestral_state=2
         ) == tsx.Tree.optimal_tree_refinement_parsimony_score(
-            tree, genotypes_without_ancestral_state, alleles, ancestral_state=2
+            tree, genotypes_without_ancestral_state, alleles=alleles, ancestral_state=2
         )
+
+    def test_large_polytomy_with_few_derived_states(self):
+        tree = tskit.Tree.generate_star(500)
+        genotypes = [0] * 496 + [1, 1, 2, 2]
+        assert tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes) == 2
+        assert (
+            tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, genotypes, ancestral_state=1
+            )
+            == 2
+        )
+
+    @pytest.mark.parametrize("ancestral_state", [None, 0, 2])
+    def test_two_dimensional_genotypes_match_single_sites(self, ancestral_state):
+        tree = tskit.Tree.generate_balanced(9, arity=3)
+        rng = np.random.default_rng(5)
+        genotypes = rng.integers(-1, 3, size=(40, 9))
+        genotypes[:, 0] = rng.integers(0, 3, size=40)
+        scores = tsx.Tree.optimal_tree_refinement_parsimony_score(
+            tree, genotypes, ancestral_state=ancestral_state
+        )
+        assert scores.shape == (40,)
+        for row, score in zip(genotypes, scores):
+            assert score == tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, row, ancestral_state=ancestral_state
+            )
+
+    def test_two_dimensional_genotypes_match_all_resolutions(self):
+        tree = tskit.Tree.generate_star(5)
+        alleles = ("A", "C", "G")
+        genotypes = [[0, 1, 2, 0, 1], [0, 0, 0, 0, 1], [2, tskit.MISSING_DATA, 1, 1, 2]]
+        scores = tsx.Tree.optimal_tree_refinement_parsimony_score(
+            tree, genotypes, alleles=alleles, ancestral_state="A"
+        )
+        assert list(scores) == [
+            binary_resolution_score(tree, row, alleles, ancestral_state="A")
+            for row in genotypes
+        ]
+
+    @pytest.mark.parametrize("ancestral_state", [None, 1])
+    def test_site_containers_give_the_same_scores(self, ancestral_state):
+        tree = tskit.Tree.generate_balanced(9, arity=3)
+        genotypes = np.random.default_rng(2).integers(0, 3, size=(25, 9))
+        expected = tsx.Tree.optimal_tree_refinement_parsimony_score(
+            tree, genotypes, ancestral_state=ancestral_state
+        )
+        for sites in (
+            list(genotypes),
+            [row.tolist() for row in genotypes],
+            tuple(map(tuple, genotypes)),
+            iter(genotypes),
+            (row for row in genotypes),
+        ):
+            scores = tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, sites, ancestral_state=ancestral_state
+            )
+            assert isinstance(scores, np.ndarray)
+            assert np.array_equal(scores, expected)
+
+    def test_iterator_is_read_in_blocks(self, monkeypatch):
+        monkeypatch.setattr(trees_module, "_CHUNK_BUDGET", 60)
+        tree = tskit.Tree.generate_balanced(9, arity=3)
+        genotypes = np.random.default_rng(3).integers(0, 3, size=(37, 9))
+        consumed = []
+
+        def sites():
+            for row in genotypes:
+                consumed.append(1)
+                yield row
+
+        scores = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, sites())
+        assert np.array_equal(
+            scores,
+            tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes),
+        )
+        assert len(consumed) == 37
+
+    def test_variants_iterator_per_tree(self):
+        ts = msprime.sim_mutations(
+            msprime.sim_ancestry(
+                8, sequence_length=200, recombination_rate=0.01, random_seed=4,
+                ploidy=1,
+            ),
+            rate=0.02,
+            random_seed=4,
+        )
+        assert ts.num_trees > 1
+        otr_variants = ts.variants()
+        reference_variants = ts.variants()
+        num_scored = 0
+        for tree in ts.trees():
+            tree_variants = itertools.islice(otr_variants, tree.num_sites)
+            scores = tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, (variant.genotypes for variant in tree_variants)
+            )
+            assert len(scores) == tree.num_sites
+            # Local trees are binary, so scores equal ordinary parsimony. Putting
+            # scores first means zip stops before taking an extra variant.
+            for score, variant in zip(scores, reference_variants):
+                assert score == len(
+                    tree.map_mutations(variant.genotypes, variant.alleles)[1]
+                )
+            num_scored += len(scores)
+        assert num_scored == ts.num_sites > 0
+
+    def test_per_site_ancestral_state_and_alleles_iterators(self):
+        ts = msprime.sim_mutations(
+            msprime.sim_ancestry(8, sequence_length=200, random_seed=4, ploidy=1),
+            rate=0.02,
+            random_seed=4,
+        )
+        tree = ts.first()
+        assert tree.num_sites > 0
+        expected = [
+            tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, v.genotypes, v.alleles.index(site.ancestral_state), v.alleles
+            )
+            for site, v in zip(ts.sites(), ts.variants())
+        ]
+        scores = tsx.Tree.optimal_tree_refinement_parsimony_score(
+            tree,
+            (v.genotypes for v in ts.variants()),
+            itertools.repeat(0),
+            (v.alleles for v in ts.variants()),
+        )
+        assert list(scores) == expected
+        # String ancestral states, resolved against each site's own alleles
+        scores = tsx.Tree.optimal_tree_refinement_parsimony_score(
+            tree,
+            (v.genotypes for v in ts.variants()),
+            (site.ancestral_state for site in ts.sites()),
+            (v.alleles for v in ts.variants()),
+        )
+        assert list(scores) == expected
+        # None entries mean the ancestral state is inferred for that site
+        scores = tsx.Tree.optimal_tree_refinement_parsimony_score(
+            tree, ts.genotype_matrix(), itertools.repeat(None)
+        )
+        assert list(scores) == list(
+            tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, ts.genotype_matrix()
+            )
+        )
+
+    def test_per_site_iterator_errors(self):
+        tree = tskit.Tree.generate_star(3)
+        genotypes = [[0, 1, 0], [1, 1, 0]]
+        with pytest.raises(ValueError, match="ancestral_state must provide"):
+            tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes, [0])
+        with pytest.raises(ValueError, match="alleles must provide"):
+            tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, genotypes, alleles=[("A", "T")]
+            )
+        with pytest.raises(ValueError, match="valid allele indexes"):
+            tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, genotypes, alleles=[("A", "T"), ("A",)]
+            )
+
+    def test_empty_inputs(self):
+        tree = tskit.Tree.generate_star(3)
+        for sites in (iter([]), np.zeros((0, 3), dtype=int)):
+            scores = tsx.Tree.optimal_tree_refinement_parsimony_score(tree, sites)
+            assert scores.shape == (0,)
+
+    def test_iterator_rejects_invalid_sites(self):
+        tree = tskit.Tree.generate_star(3)
+        with pytest.raises(ValueError, match="one-dimensional arrays"):
+            tsx.Tree.optimal_tree_refinement_parsimony_score(tree, iter([0, 1, 0]))
+        with pytest.raises(ValueError, match="non-missing"):
+            tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, iter([[0, 1, 0], [tskit.MISSING_DATA] * 3])
+            )
+        with pytest.raises(ValueError, match="one entry for each"):
+            tsx.Tree.optimal_tree_refinement_parsimony_score(tree, iter([[0, 1]]))
+
+    def test_many_states_in_one_polytomy(self):
+        tree = tskit.Tree.generate_star(6)
+        alleles = tuple("ABCDEF")
+        genotypes = [0, 1, 2, 3, 4, 5]
+        for ancestral_state in (None, 0, 5):
+            assert tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, genotypes, alleles=alleles, ancestral_state=ancestral_state
+            ) == binary_resolution_score(
+                tree, genotypes, alleles, ancestral_state=ancestral_state
+            )
+
+    def test_unobserved_alleles_do_not_change_score(self):
+        tree = tskit.Tree.generate_star(5)
+        genotypes = [0, 1, 1, 0, 1]
+        assert tsx.Tree.optimal_tree_refinement_parsimony_score(
+            tree, genotypes, alleles=tuple("ABCDEFGH")
+        ) == tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes)
+
+    def test_rejects_site_with_only_missing_data(self):
+        tree = tskit.Tree.generate_star(3)
+        with pytest.raises(ValueError, match="non-missing"):
+            tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, [[0, 1, 0], [tskit.MISSING_DATA] * 3]
+            )
+        with pytest.raises(ValueError, match="one entry for each"):
+            tsx.Tree.optimal_tree_refinement_parsimony_score(tree, [[0, 1]])
 
     def test_string_ancestral_state_requires_alleles(self):
         tree = tskit.Tree.generate_star(3)
@@ -151,15 +353,15 @@ class TestOptimalTreeRefinementParsimonyScore:
         tree = tskit.Tree.generate_star(3)
         with pytest.raises(ValueError, match="one entry for each"):
             tsx.Tree.optimal_tree_refinement_parsimony_score(
-                tree, [0, 1], ("A", "G")
+                tree, [0, 1], alleles=("A", "G")
             )
         with pytest.raises(ValueError, match="non-missing"):
             tsx.Tree.optimal_tree_refinement_parsimony_score(
-                tree, [tskit.MISSING_DATA] * 3, ("A", "G")
+                tree, [tskit.MISSING_DATA] * 3, alleles=("A", "G")
             )
         with pytest.raises(ValueError, match="valid allele indexes"):
             tsx.Tree.optimal_tree_refinement_parsimony_score(
-                tree, [0, 1, 2], ("A", "G")
+                tree, [0, 1, 2], alleles=("A", "G")
             )
 
 
@@ -230,7 +432,7 @@ def test_otr_scores_removed_infinite_sites_mutations(removal_fraction):
             )[1]
         )
         otr_score = tsx.Tree.optimal_tree_refinement_parsimony_score(
-            tree, genotypes, alleles, ancestral_state=ancestral_state
+            tree, genotypes, alleles=alleles, ancestral_state=ancestral_state
         )
         assert otr_score == 1
         num_scored += 1

@@ -1,5 +1,7 @@
 """Utilities that operate on tskit trees and tree topologies."""
 
+import collections.abc
+import itertools
 import json
 
 import numpy as np
@@ -91,6 +93,209 @@ class TreeNode:
         yield from generate(root, 1)
 
 
+def _polytomy_node_costs(child_costs, num_states):
+    """
+    Return the minimum score below a polytomy root for each root state.
+
+    Each child's cost vector is split into ``mins`` (its best score in any state)
+    and ``deltas`` (the extra cost of being in each state). Given the root state
+    ``r``, a binary refinement costs one change for each other state ``t`` in a
+    set ``T`` of states used by the children, so the cost is
+    ``len(T) + sum_i min(deltas[i, T + [r]])``. If ``r`` is not used by any child,
+    the root needs two children, so a single-state ``T`` costs one more change.
+
+    Only states that are optimal for at least one child can usefully be in ``T``,
+    and identical children are grouped, so the cost is exponential only in the
+    number of such states rather than in the number of children.
+    """
+    costs = np.array(child_costs, dtype=float)
+    mins = costs.min(axis=1)
+    deltas, counts = np.unique(costs - mins[:, None], axis=0, return_counts=True)
+    base = mins.sum()
+    candidates = np.flatnonzero((deltas == 0).any(axis=0))
+
+    node_costs = []
+    for root_state in range(num_states):
+        root_deltas = deltas[:, root_state]
+        best = counts @ root_deltas
+        others = [s for s in candidates if s != root_state]
+        for size in range(1, len(others) + 1):
+            for subset in itertools.combinations(others, size):
+                subset_deltas = deltas[:, subset].min(axis=1)
+                total = size + counts @ np.minimum(subset_deltas, root_deltas)
+                if size == 1 and not np.any(root_deltas <= subset_deltas):
+                    total += 1
+                best = min(best, total)
+        node_costs.append(base + best)
+    return node_costs
+
+
+# Above this many states, enumerating every state subset for all sites at once is
+# less efficient than the per-site search over only the optimal states.
+_MAX_VECTORISED_STATES = 5
+
+# Approximate maximum number of float entries held in cost arrays at once.
+_CHUNK_BUDGET = 4_000_000
+
+
+def _add_edge_cost(costs):
+    """
+    Return the costs of choosing each state above a subtree, so that a change
+    between the chosen state and the subtree's root state costs one.
+
+    ``costs`` has shape ``(num_sites, num_states)``.
+    """
+    return np.minimum(costs, costs.min(axis=1, keepdims=True) + 1)
+
+
+def _polytomy_costs_batch(child_costs):
+    """
+    A version of ``_polytomy_node_costs`` that handles many sites at once.
+
+    ``child_costs`` has shape ``(num_children, num_sites, num_states)``; the result
+    has shape ``(num_sites, num_states)``. Every subset of states is considered,
+    rather than only those that are optimal for some child, so that the same code
+    applies to all sites.
+    """
+    num_children, num_sites, num_states = child_costs.shape
+    mins = child_costs.min(axis=2)
+    deltas = child_costs - mins[:, :, None]
+    node_costs = np.empty((num_sites, num_states))
+    base = mins.sum(axis=0)
+    for root_state in range(num_states):
+        root_deltas = deltas[:, :, root_state]
+        best = root_deltas.sum(axis=0)
+        others = [s for s in range(num_states) if s != root_state]
+        for size in range(1, len(others) + 1):
+            for subset in itertools.combinations(others, size):
+                if size == 1:
+                    subset_deltas = deltas[:, :, subset[0]]
+                else:
+                    subset_deltas = deltas[:, :, list(subset)].min(axis=2)
+                total = size + np.minimum(subset_deltas, root_deltas).sum(axis=0)
+                if size == 1:
+                    # No child uses the root state, so the root needs two children
+                    total += (root_deltas > subset_deltas).all(axis=0)
+                best = np.minimum(best, total)
+        node_costs[:, root_state] = base + best
+    return node_costs
+
+
+def _score_sites(tree, nodes, children, sample_columns, genotypes, num_states, anc):
+    """
+    Return the OTR parsimony score for each row of ``genotypes``.
+
+    ``nodes`` is the postorder node list, ``children`` maps each node to a tuple of
+    its children, and ``sample_columns`` maps sample nodes to genotype columns.
+    ``anc`` is an integer array with the ancestral state index for each site, or
+    ``-1`` for sites where it should be chosen to minimise the score.
+    """
+    num_sites = genotypes.shape[0]
+    states = np.arange(num_states)
+    costs = {}
+    for u in nodes:
+        child_nodes = children[u]
+        if len(child_nodes) == 0:
+            node_costs = np.zeros((num_sites, num_states))
+        elif len(child_nodes) == 1:
+            node_costs = _add_edge_cost(costs.pop(child_nodes[0]))
+        elif len(child_nodes) == 2:
+            node_costs = _add_edge_cost(costs.pop(child_nodes[0]))
+            node_costs += _add_edge_cost(costs.pop(child_nodes[1]))
+        else:
+            child_costs = np.stack([costs.pop(v) for v in child_nodes])
+            if num_states <= _MAX_VECTORISED_STATES:
+                node_costs = _polytomy_costs_batch(child_costs)
+            else:
+                node_costs = np.array(
+                    [
+                        _polytomy_node_costs(child_costs[:, site], num_states)
+                        for site in range(num_sites)
+                    ]
+                )
+
+        column = sample_columns.get(u)
+        if column is not None:
+            observed = genotypes[:, column]
+            excluded = (observed != tskit.MISSING_DATA)[:, None] & (
+                observed[:, None] != states[None, :]
+            )
+            node_costs = np.where(excluded, np.inf, node_costs)
+        costs[u] = node_costs
+
+    # All roots share the same state immediately above the forest. If fixed,
+    # charge each root edge against it; otherwise minimize over that state.
+    total = sum(_add_edge_cost(costs[root]) for root in tree.roots)
+    # Negative entries of ``anc`` mean that the state is to be chosen.
+    fixed = total[np.arange(num_sites), np.maximum(anc, 0)]
+    return np.where(anc >= 0, fixed, total.min(axis=1))
+
+
+def _check_genotypes(genotypes, num_samples, num_alleles):
+    """
+    Check a two-dimensional ``(num_sites, num_samples)`` genotype array.
+    ``num_alleles`` is ``None``, or an integer or array with the number of alleles
+    for each site.
+    """
+    if genotypes.shape[1] != num_samples:
+        raise ValueError("genotypes must have one entry for each tree sequence sample")
+    if np.any(genotypes < tskit.MISSING_DATA):
+        raise ValueError("genotypes must be valid allele indexes or MISSING_DATA")
+    if num_alleles is not None and np.any(
+        genotypes >= np.reshape(num_alleles, (-1, 1))
+    ):
+        raise ValueError("genotypes must be valid allele indexes or MISSING_DATA")
+    if not np.all(np.any(genotypes != tskit.MISSING_DATA, axis=1)):
+        raise ValueError(
+            "At least one non-missing observation must be provided for each site"
+        )
+
+
+def _normalise_alleles(alleles):
+    alleles = tuple(alleles)
+    if len(alleles) == 0:
+        raise ValueError("At least one allele is required")
+    if len(alleles) > 64:
+        raise ValueError("A maximum of 64 states is supported")
+    return alleles
+
+
+def _split_alleles(alleles):
+    """
+    Return ``(shared, per_site)`` for the ``alleles`` of a multi-site call. A flat
+    sequence of labels is shared by all sites; an iterable of sequences gives the
+    alleles of each site in turn.
+    """
+    if alleles is None:
+        return None, None
+    iterator = iter(alleles)
+    try:
+        first = next(iterator)
+    except StopIteration:
+        return _normalise_alleles(()), None
+    iterator = itertools.chain([first], iterator)
+    if isinstance(first, str):
+        return _normalise_alleles(iterator), None
+    return None, iterator
+
+
+def _resolve_ancestral_state(ancestral_state, alleles):
+    """
+    Return the ancestral state index, or ``-1`` if it is to be chosen.
+    """
+    if ancestral_state is None:
+        return -1
+    if isinstance(ancestral_state, str):
+        if alleles is None:
+            raise ValueError("alleles must be provided when ancestral_state is a string")
+        return alleles.index(ancestral_state)
+    if not isinstance(ancestral_state, int | np.integer):
+        raise TypeError("ancestral_state must be an integer or allele label")
+    ancestral_state = int(ancestral_state)
+    if ancestral_state < 0 or (alleles is not None and ancestral_state >= len(alleles)):
+        raise ValueError("ancestral_state not between 0 and (num_alleles-1)")
+    return ancestral_state
+
 class Tree:
     """
     Methods that operate on a :class:`tskit.Tree`.
@@ -98,7 +303,7 @@ class Tree:
 
     @staticmethod
     def optimal_tree_refinement_parsimony_score(
-        tree, genotypes, alleles=None, ancestral_state=None
+        tree, genotypes, ancestral_state=None, alleles=None
     ):
         """
         Return the minimum Optimal Tree Refinement (OTR) parsimony score over all
@@ -116,194 +321,145 @@ class Tree:
         chosen to minimize the score. ``tskit.MISSING_DATA`` is not a valid
         ancestral state. The input tree is not modified.
 
-        The binary-state algorithm is linear in the number of children at each
-        polytomy. For more than two states, an exact subset dynamic program is used;
-        its cost is exponential in the degree of each polytomy.
+        The algorithm is linear in the number of children at each polytomy, but
+        exponential in the number of distinct states that are optimal for at least
+        one child of that polytomy. This is small unless many different states are
+        observed below a single polytomy.
 
         :param tskit.Tree tree: The tree to score.
-        :param array_like genotypes: State indexes for the tree sequence samples.
+        :param array_like genotypes: State indexes for the tree sequence samples. This
+            can be a one-dimensional array for a single site, or a two-dimensional
+            array of shape ``(num_sites, num_samples)`` (including a list of
+            per-site sequences), such as that returned by
+            :meth:`tskit.TreeSequence.genotype_matrix`, to score many sites on the
+            same tree at once. This is much faster than scoring each site
+            separately, as the work done for each node is shared by all sites.
+            It can also be an iterator that yields one one-dimensional array per
+            site, such as ``(v.genotypes for v in ts.variants())``; the sites are
+            then read and scored in blocks, so they need not all be held in memory.
+        :param ancestral_state: An optional ancestral state label or state index.
+            ``alleles`` must be provided when this is a string label. For many
+            sites, this can also be an iterable (such as a list, or
+            ``itertools.repeat(0)``) with one value for each site, in the same
+            order as ``genotypes``, where ``None`` means that the state for that
+            site is chosen to minimise the score. Values beyond the number of
+            sites are ignored; too few values is an error.
         :param iterable alleles: Optional state labels indexed by ``genotypes``.
             If omitted, the state space is inferred from the genotype indexes
-            and any integer ``ancestral_state``.
-        :param ancestral_state: An optional ancestral state label or state index.
-            ``alleles`` must be provided when this is a string label.
-        :return: The minimum number of state changes over all binary refinements.
-        :rtype: int
+            and any integer ``ancestral_state``. For many sites, a flat sequence of
+            labels is used for every site, but an iterable of sequences (such as
+            ``(v.alleles for v in ts.variants())``) gives the alleles of each site
+            in turn.
+        :return: The minimum number of state changes over all binary refinements:
+            an integer for one-dimensional ``genotypes``, or an integer array with
+            one score per site for two-dimensional or iterator ``genotypes``.
+        :rtype: int or numpy.ndarray
         """
-        if alleles is not None:
-            alleles = tuple(alleles)
-            if len(alleles) == 0:
-                raise ValueError("At least one allele is required")
-            if len(alleles) > 64:
-                raise ValueError("A maximum of 64 states is supported")
+        streaming = isinstance(genotypes, collections.abc.Iterator)
+        single_site = False
+        if not streaming:
+            genotypes = tskit.util.safe_np_int_cast(genotypes, np.int8)
+            if genotypes.ndim not in (1, 2):
+                raise ValueError("genotypes must be a one- or two-dimensional array")
+            single_site = genotypes.ndim == 1
+            genotypes = np.atleast_2d(genotypes)
 
-        genotypes = tskit.util.safe_np_int_cast(genotypes, np.int8)
-        if genotypes.ndim != 1:
-            raise ValueError("genotypes must be a one-dimensional array")
-        sample_nodes = tuple(tree.tree_sequence.samples())
-        if len(genotypes) != len(sample_nodes):
-            raise ValueError(
-                "genotypes must have one entry for each tree sequence sample"
-            )
-        if np.any(genotypes < tskit.MISSING_DATA):
-            raise ValueError("genotypes must be valid allele indexes or MISSING_DATA")
-        if alleles is not None and np.any(genotypes >= len(alleles)):
-            raise ValueError("genotypes must be valid allele indexes or MISSING_DATA")
-        if not np.any(genotypes != tskit.MISSING_DATA):
-            raise ValueError("At least one non-missing observation must be provided")
-
-        if isinstance(ancestral_state, str):
-            if alleles is None:
-                raise ValueError(
-                    "alleles must be provided when ancestral_state is a string"
-                )
-            ancestral_state = alleles.index(ancestral_state)
-        elif ancestral_state is not None:
-            if not isinstance(ancestral_state, int | np.integer):
-                raise TypeError("ancestral_state must be an integer or allele label")
-            ancestral_state = int(ancestral_state)
-            if ancestral_state < 0 or (
-                alleles is not None and ancestral_state >= len(alleles)
-            ):
-                raise ValueError("ancestral_state not between 0 and (num_alleles-1)")
-
-        if alleles is None:
-            max_observed_state = int(
-                np.max(genotypes[genotypes != tskit.MISSING_DATA])
-            )
-            if max_observed_state >= 64 or (
-                ancestral_state is not None and ancestral_state >= 64
-            ):
-                raise ValueError("A maximum of 64 states is supported")
-            num_states = max_observed_state + 1
-            if ancestral_state is not None:
-                num_states = max(num_states, ancestral_state + 1)
+        # For many sites, ancestral_state and alleles can each be shared by all
+        # sites or be iterables with one value per site.
+        ancestral_states = None
+        if single_site:
+            shared_alleles = None if alleles is None else _normalise_alleles(alleles)
+            alleles_by_site = None
         else:
-            num_states = len(alleles)
-        sample_state = dict(zip(sample_nodes, genotypes))
-        costs = [None] * tree.tree_sequence.num_nodes
-
-        def cost_to_state(state_costs, state):
-            # Add the edge cost for choosing `state` above this child subtree.
-            return min(
-                cost + (child_state != state)
-                for child_state, cost in enumerate(state_costs)
+            shared_alleles, alleles_by_site = _split_alleles(alleles)
+            if isinstance(ancestral_state, collections.abc.Iterable) and not isinstance(
+                ancestral_state, str
+            ):
+                ancestral_states = iter(ancestral_state)
+        shared_ancestral_state = None
+        if ancestral_states is None and alleles_by_site is None:
+            shared_ancestral_state = _resolve_ancestral_state(
+                ancestral_state, shared_alleles
             )
 
-        # costs[u][s] is the minimum score below u conditional on u having state s.
-        for u in tree.nodes(order="postorder"):
-            children = tuple(tree.children(u))
-            child_costs = [costs[v] for v in children]
+        sample_nodes = tuple(tree.tree_sequence.samples())
+        nodes = list(tree.nodes(order="postorder"))
+        children = {u: tuple(tree.children(u)) for u in nodes}
+        sample_columns = {u: column for column, u in enumerate(sample_nodes)}
 
-            if len(children) == 0:
-                node_costs = [0] * num_states
-            elif len(children) == 1:
-                node_costs = [
-                    cost_to_state(child_costs[0], state)
-                    for state in range(num_states)
-                ]
-            elif len(children) == 2:
-                node_costs = [
-                    sum(cost_to_state(vector, state) for vector in child_costs)
-                    for state in range(num_states)
-                ]
-            elif num_states == 2:
-                node_costs = []
-                for parent_state in range(num_states):
-                    # In a binary refinement, child roots can all use the
-                    # parent's state, all use the opposite state, or use both.
-                    # Those cases cost 0, 2, or 1 changes at the new root,
-                    # respectively; the assignment DP finds the cheapest mixed
-                    # assignment without enumerating child subsets.
-                    same_state_cost = sum(
-                        vector[parent_state] for vector in child_costs
-                    )
-                    opposite_state_cost = (
-                        sum(vector[1 - parent_state] for vector in child_costs) + 2
-                    )
+        def take(iterator, num_sites, name):
+            values = list(itertools.islice(iterator, num_sites))
+            if len(values) < num_sites:
+                raise ValueError(f"{name} must provide a value for each site")
+            return values
 
-                    assignment_costs = [0, np.inf, np.inf, np.inf]
-                    for vector in child_costs:
-                        next_assignment_costs = [np.inf] * 4
-                        for category, partial_cost in enumerate(assignment_costs):
-                            for state in range(num_states):
-                                next_category = category | (1 << state)
-                                next_assignment_costs[next_category] = min(
-                                    next_assignment_costs[next_category],
-                                    partial_cost + vector[state],
-                                )
-                        assignment_costs = next_assignment_costs
-
-                    mixed_state_cost = assignment_costs[3] + 1
-                    node_costs.append(
-                        min(
-                            same_state_cost,
-                            opposite_state_cost,
-                            mixed_state_cost,
-                        )
-                    )
+        def score_block(block):
+            num_sites = len(block)
+            if num_sites == 0:
+                return np.zeros(0, dtype=np.int64)
+            if alleles_by_site is None:
+                site_alleles = [shared_alleles] * num_sites
+                num_alleles = None if shared_alleles is None else len(shared_alleles)
             else:
-                num_children = len(children)
-                num_subsets = 1 << num_children
-                # subset_costs[S][s] is the minimum score for a binary subtree
-                # rooted in state s and containing exactly the child subtrees in S.
-                # Singleton subsets are the original child nodes; larger subsets
-                # are joined by a newly introduced binary node.
-                subset_costs = [None] * num_subsets
-                costs_to_parent_state = [None] * num_subsets
-                for i, vector in enumerate(child_costs):
-                    subset = 1 << i
-                    subset_costs[subset] = vector
-                    costs_to_parent_state[subset] = [
-                        cost_to_state(vector, state) for state in range(num_states)
+                site_alleles = [
+                    _normalise_alleles(a)
+                    for a in take(alleles_by_site, num_sites, "alleles")
+                ]
+                num_alleles = np.array([len(a) for a in site_alleles])
+            if shared_ancestral_state is not None:
+                anc = np.full(num_sites, shared_ancestral_state)
+            else:
+                if ancestral_states is None:
+                    values = [ancestral_state] * num_sites
+                else:
+                    values = take(ancestral_states, num_sites, "ancestral_state")
+                anc = np.array(
+                    [
+                        _resolve_ancestral_state(value, site_alleles_i)
+                        for value, site_alleles_i in zip(values, site_alleles)
                     ]
+                )
+            _check_genotypes(block, len(sample_nodes), num_alleles)
 
-                for subset in range(1, num_subsets):
-                    if subset.bit_count() == 1:
-                        continue
-                    best_costs = [np.inf] * num_states
-                    first_bit = subset & -subset
-                    left_subset = (subset - 1) & subset
-                    while left_subset:
-                        right_subset = subset ^ left_subset
-                        # Each bipartition is symmetric, so require the lowest
-                        # indexed child to be in the left subset.
-                        if right_subset and left_subset & first_bit:
-                            for state in range(num_states):
-                                best_costs[state] = min(
-                                    best_costs[state],
-                                    costs_to_parent_state[left_subset][state]
-                                    + costs_to_parent_state[right_subset][state],
-                                )
-                        left_subset = (left_subset - 1) & subset
+            # States that are neither observed nor the ancestral state can never
+            # lower the score, so they are left out of the calculation.
+            num_states = max(int(block.max()), int(anc.max())) + 1
+            if num_states > 64:
+                raise ValueError("A maximum of 64 states is supported")
+            # Bound the memory used by the cost arrays alive at any one time
+            chunk_size = max(1, _CHUNK_BUDGET // (num_states * len(nodes)))
+            return np.concatenate(
+                [
+                    _score_sites(
+                        tree,
+                        nodes,
+                        children,
+                        sample_columns,
+                        block[start : start + chunk_size],
+                        num_states,
+                        anc[start : start + chunk_size],
+                    )
+                    for start in range(0, num_sites, chunk_size)
+                ]
+            ).astype(np.int64)
 
-                    subset_costs[subset] = best_costs
-                    costs_to_parent_state[subset] = [
-                        cost_to_state(best_costs, state) for state in range(num_states)
-                    ]
+        if streaming:
+            # Stream the sites in blocks, so that they never need to all be in memory
+            block_size = max(1, _CHUNK_BUDGET // (4 * len(nodes)))
+            results = [np.zeros(0, dtype=np.int64)]
+            while rows := list(itertools.islice(genotypes, block_size)):
+                block = tskit.util.safe_np_int_cast(rows, np.int8)
+                if block.ndim != 2:
+                    raise ValueError(
+                        "An iterator of genotypes must yield one-dimensional arrays"
+                    )
+                results.append(score_block(block))
+            return np.concatenate(results)
 
-                node_costs = subset_costs[-1]
-
-            if tree.is_sample(u):
-                observed_state = sample_state[u]
-                if observed_state != tskit.MISSING_DATA:
-                    node_costs = [
-                        cost if state == observed_state else np.inf
-                        for state, cost in enumerate(node_costs)
-                    ]
-            costs[u] = node_costs
-
-        # All roots share the same state immediately above the forest. If fixed,
-        # charge each root edge against it; otherwise minimize over that state.
-        root_costs = [costs[root] for root in tree.roots]
-        if ancestral_state is None:
-            return min(
-                sum(cost_to_state(vector, state) for vector in root_costs)
-                for state in range(num_states)
-            )
-        return sum(
-            cost_to_state(vector, ancestral_state) for vector in root_costs
-        )
+        scores = score_block(genotypes)
+        if single_site:
+            return int(scores[0])
+        return scores
 
     @staticmethod
     def all_binary_resolutions(tree, *, epsilon=None, record_provenance=True, **kwargs):
