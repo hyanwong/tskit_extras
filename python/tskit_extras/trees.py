@@ -1,5 +1,6 @@
 """Utilities that operate on tskit trees and tree topologies."""
 
+import itertools
 import json
 
 import numpy as np
@@ -91,6 +92,43 @@ class TreeNode:
         yield from generate(root, 1)
 
 
+def _polytomy_node_costs(child_costs, num_states):
+    """
+    Return the minimum score below a polytomy root for each root state.
+
+    Each child's cost vector is split into ``mins`` (its best score in any state)
+    and ``deltas`` (the extra cost of being in each state). Given the root state
+    ``r``, a binary refinement costs one change for each other state ``t`` in a
+    set ``T`` of states used by the children, so the cost is
+    ``len(T) + sum_i min(deltas[i, T + [r]])``. If ``r`` is not used by any child,
+    the root needs two children, so a single-state ``T`` costs one more change.
+
+    Only states that are optimal for at least one child can usefully be in ``T``,
+    and identical children are grouped, so the cost is exponential only in the
+    number of such states rather than in the number of children.
+    """
+    costs = np.array(child_costs, dtype=float)
+    mins = costs.min(axis=1)
+    deltas, counts = np.unique(costs - mins[:, None], axis=0, return_counts=True)
+    base = mins.sum()
+    candidates = np.flatnonzero((deltas == 0).any(axis=0))
+
+    node_costs = []
+    for root_state in range(num_states):
+        root_deltas = deltas[:, root_state]
+        best = counts @ root_deltas
+        others = [s for s in candidates if s != root_state]
+        for size in range(1, len(others) + 1):
+            for subset in itertools.combinations(others, size):
+                subset_deltas = deltas[:, subset].min(axis=1)
+                total = size + counts @ np.minimum(subset_deltas, root_deltas)
+                if size == 1 and not np.any(root_deltas <= subset_deltas):
+                    total += 1
+                best = min(best, total)
+        node_costs.append(base + best)
+    return node_costs
+
+
 class Tree:
     """
     Methods that operate on a :class:`tskit.Tree`.
@@ -116,9 +154,10 @@ class Tree:
         chosen to minimize the score. ``tskit.MISSING_DATA`` is not a valid
         ancestral state. The input tree is not modified.
 
-        The binary-state algorithm is linear in the number of children at each
-        polytomy. For more than two states, an exact subset dynamic program is used;
-        its cost is exponential in the degree of each polytomy.
+        The algorithm is linear in the number of children at each polytomy, but
+        exponential in the number of distinct states that are optimal for at least
+        one child of that polytomy. This is small unless many different states are
+        observed below a single polytomy.
 
         :param tskit.Tree tree: The tree to score.
         :param array_like genotypes: State indexes for the tree sequence samples.
@@ -207,82 +246,8 @@ class Tree:
                     sum(cost_to_state(vector, state) for vector in child_costs)
                     for state in range(num_states)
                 ]
-            elif num_states == 2:
-                node_costs = []
-                for parent_state in range(num_states):
-                    # In a binary refinement, child roots can all use the
-                    # parent's state, all use the opposite state, or use both.
-                    # Those cases cost 0, 2, or 1 changes at the new root,
-                    # respectively; the assignment DP finds the cheapest mixed
-                    # assignment without enumerating child subsets.
-                    same_state_cost = sum(
-                        vector[parent_state] for vector in child_costs
-                    )
-                    opposite_state_cost = (
-                        sum(vector[1 - parent_state] for vector in child_costs) + 2
-                    )
-
-                    assignment_costs = [0, np.inf, np.inf, np.inf]
-                    for vector in child_costs:
-                        next_assignment_costs = [np.inf] * 4
-                        for category, partial_cost in enumerate(assignment_costs):
-                            for state in range(num_states):
-                                next_category = category | (1 << state)
-                                next_assignment_costs[next_category] = min(
-                                    next_assignment_costs[next_category],
-                                    partial_cost + vector[state],
-                                )
-                        assignment_costs = next_assignment_costs
-
-                    mixed_state_cost = assignment_costs[3] + 1
-                    node_costs.append(
-                        min(
-                            same_state_cost,
-                            opposite_state_cost,
-                            mixed_state_cost,
-                        )
-                    )
             else:
-                num_children = len(children)
-                num_subsets = 1 << num_children
-                # subset_costs[S][s] is the minimum score for a binary subtree
-                # rooted in state s and containing exactly the child subtrees in S.
-                # Singleton subsets are the original child nodes; larger subsets
-                # are joined by a newly introduced binary node.
-                subset_costs = [None] * num_subsets
-                costs_to_parent_state = [None] * num_subsets
-                for i, vector in enumerate(child_costs):
-                    subset = 1 << i
-                    subset_costs[subset] = vector
-                    costs_to_parent_state[subset] = [
-                        cost_to_state(vector, state) for state in range(num_states)
-                    ]
-
-                for subset in range(1, num_subsets):
-                    if subset.bit_count() == 1:
-                        continue
-                    best_costs = [np.inf] * num_states
-                    first_bit = subset & -subset
-                    left_subset = (subset - 1) & subset
-                    while left_subset:
-                        right_subset = subset ^ left_subset
-                        # Each bipartition is symmetric, so require the lowest
-                        # indexed child to be in the left subset.
-                        if right_subset and left_subset & first_bit:
-                            for state in range(num_states):
-                                best_costs[state] = min(
-                                    best_costs[state],
-                                    costs_to_parent_state[left_subset][state]
-                                    + costs_to_parent_state[right_subset][state],
-                                )
-                        left_subset = (left_subset - 1) & subset
-
-                    subset_costs[subset] = best_costs
-                    costs_to_parent_state[subset] = [
-                        cost_to_state(best_costs, state) for state in range(num_states)
-                    ]
-
-                node_costs = subset_costs[-1]
+                node_costs = _polytomy_node_costs(child_costs, num_states)
 
             if tree.is_sample(u):
                 observed_state = sample_state[u]
@@ -297,12 +262,14 @@ class Tree:
         # charge each root edge against it; otherwise minimize over that state.
         root_costs = [costs[root] for root in tree.roots]
         if ancestral_state is None:
-            return min(
-                sum(cost_to_state(vector, state) for vector in root_costs)
-                for state in range(num_states)
+            return int(
+                min(
+                    sum(cost_to_state(vector, state) for vector in root_costs)
+                    for state in range(num_states)
+                )
             )
-        return sum(
-            cost_to_state(vector, ancestral_state) for vector in root_costs
+        return int(
+            sum(cost_to_state(vector, ancestral_state) for vector in root_costs)
         )
 
     @staticmethod

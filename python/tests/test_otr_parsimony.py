@@ -140,6 +140,17 @@ class TestOptimalTreeRefinementParsimonyScore:
             tree, genotypes_without_ancestral_state, alleles, ancestral_state=2
         )
 
+    def test_large_polytomy_with_few_derived_states(self):
+        tree = tskit.Tree.generate_star(500)
+        genotypes = [0] * 496 + [1, 1, 2, 2]
+        assert tsx.Tree.optimal_tree_refinement_parsimony_score(tree, genotypes) == 2
+        assert (
+            tsx.Tree.optimal_tree_refinement_parsimony_score(
+                tree, genotypes, ancestral_state=1
+            )
+            == 2
+        )
+
     def test_string_ancestral_state_requires_alleles(self):
         tree = tskit.Tree.generate_star(3)
         with pytest.raises(ValueError, match="alleles must be provided"):
